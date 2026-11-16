@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FacultyFlow — Academic Intelligence Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+<style>
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --surface2: #f9f8f6;
+    --border: #e2ddd8;
+    --border2: #ccc8c2;
+    --text: #1c1917;
+    --text2: #57534e;
+    --text3: #a8a29e;
+    --accent: #2d6a4f;
+    --accent2: #40916c;
+    --accent-light: #d8f3dc;
+    --red: #c0392b;
+    --red-light: #fde8e8;
+    --orange: #c05621;
+    --orange-light: #fef3e2;
+    --amber: #92400e;
+    --amber-light: #fef9c3;
+    --green: #166534;
+    --green-light: #dcfce7;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+    --shadow-lg: 0 10px 30px rgba(0,0,0,0.12), 0 4px 10px rgba(0,0,0,0.06);
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+  td, th { font-variant-numeric: tabular-nums; }
+
+  /* Buttons */
+  .btn { background: var(--accent); color: #fff; padding: .5rem 1rem; border-radius: var(--radius-sm); font-weight: 500; font-size: .875rem; transition: all .15s; cursor: pointer; border: none; }
+  .btn:hover { background: var(--accent2); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+  .btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+  .btn-ghost { background: transparent; color: var(--text2); padding: .5rem 1rem; border-radius: var(--radius-sm); font-weight: 500; font-size: .875rem; border: 1.5px solid var(--border2); transition: all .15s; cursor: pointer; }
+  .btn-ghost:hover { background: var(--surface2); border-color: var(--border2); }
+  .btn-ghost:disabled { opacity: .55; cursor: not-allowed; }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-danger:hover { background: #9b2226; }
+
+  /* Inputs */
+  .inp { border: 1.5px solid var(--border); border-radius: var(--radius-sm); padding: .45rem .7rem; background: var(--surface); width: 100%; font-size: .875rem; color: var(--text); font-family: inherit; transition: border .15s; }
+  .inp:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(45,106,79,.12); }
+
+  /* Cards */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; box-shadow: var(--shadow); }
+  .card-flat { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; }
+
+  /* Tabs */
+  .tab { padding: .6rem 1.1rem; border-bottom: 2.5px solid transparent; white-space: nowrap; font-size: .875rem; color: var(--text2); font-weight: 500; cursor: pointer; transition: all .15s; background: none; border-top: none; border-left: none; border-right: none; }
+  .tab.on { border-bottom-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .tab:hover:not(.on) { color: var(--text); border-bottom-color: var(--border2); }
+
+  /* Badges */
+  .badge { padding: .2rem .6rem; border-radius: 999px; font-size: .72rem; font-weight: 600; display: inline-block; letter-spacing: .01em; }
+  .badge-urgent   { background: #fde8e8; color: #7f1d1d; border: 1px solid #fca5a5; }
+  .badge-critical, .badge-Critical, .badge-High { background: var(--red-light); color: var(--red); border: 1px solid #fca5a5; }
+  .badge-advisory, .badge-Advisory, .badge-Medium { background: var(--orange-light); color: var(--orange); border: 1px solid #fdba74; }
+  .badge-safe, .badge-Safe, .badge-Low, .badge-None, .badge-No { background: var(--green-light); color: var(--green); border: 1px solid #86efac; }
+  .badge-nodata, .badge-No.Data { background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; }
+
+  /* Tables */
+  th { text-align: left; font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text2); background: var(--surface2); padding: .6rem .85rem; border-bottom: 1.5px solid var(--border); }
+  td { padding: .6rem .85rem; border-bottom: 1px solid var(--border); vertical-align: top; font-size: .875rem; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+
+  /* Empty states */
+  .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text3); }
+
+  /* 3D canvas */
+  #bg-canvas { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; }
+
+  /* Login overlay */
+  #login-overlay { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; }
+
+  /* Spinner */
+  .spinner { width: 20px; height: 20px; border: 2.5px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; display: inline-block; vertical-align: middle; margin-right: .4rem; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Chatbot */
+  #chat-btn { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 999; width: 54px; height: 54px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 1.4rem; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: var(--shadow-lg); border: none; transition: all .2s; }
+  #chat-btn:hover { background: var(--accent2); transform: scale(1.08); }
+  #chat-panel { position: fixed; bottom: 5rem; right: 1.5rem; width: 320px; max-height: 440px; z-index: 998; display: none; flex-direction: column; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-lg); border: 1px solid var(--border); }
+  #chat-panel.open { display: flex; }
+  #chat-header { background: var(--accent); color: #fff; padding: .75rem 1rem; font-weight: 600; font-size: .9rem; display: flex; align-items: center; gap: .5rem; }
+  #chat-messages { flex: 1; overflow-y: auto; padding: .75rem; background: var(--surface); display: flex; flex-direction: column; gap: .5rem; }
+  .chat-msg { padding: .55rem .75rem; border-radius: 10px; font-size: .82rem; max-width: 85%; line-height: 1.5; }
+  .chat-bot { background: var(--surface2); border: 1px solid var(--border); color: var(--text); align-self: flex-start; border-bottom-left-radius: 3px; }
+  .chat-user { background: var(--accent); color: #fff; align-self: flex-end; border-bottom-right-radius: 3px; }
+  #chat-input-row { display: flex; border-top: 1px solid var(--border); background: var(--surface); }
+  #chat-input { flex: 1; border: none; padding: .65rem .9rem; font-size: .85rem; font-family: inherit; background: transparent; }
+  #chat-input:focus { outline: none; }
+  #chat-send { background: none; border: none; padding: .5rem .85rem; color: var(--accent); font-size: 1.1rem; cursor: pointer; font-weight: 700; }
+
+  /* Stat cards */
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem 1.4rem; box-shadow: var(--shadow); }
+  .stat-value { font-size: 2rem; font-weight: 700; line-height: 1; }
+  .stat-label { font-size: .78rem; font-weight: 500; color: var(--text2); text-transform: uppercase; letter-spacing: .04em; margin-top: .4rem; }
+
+  /* Probability bar */
+  .prob-bar-wrap { background: var(--surface2); border-radius: 999px; height: 8px; overflow: hidden; margin-top: .3rem; }
+  .prob-bar { height: 100%; border-radius: 999px; transition: width .5s ease; }
+
+  /* Advisory tier banners */
+  .tier-urgent   { background: #fff1f2; border-left: 4px solid #be123c; }
+  .tier-critical { background: var(--red-light); border-left: 4px solid #dc2626; }
+  .tier-advisory { background: var(--amber-light); border-left: 4px solid #d97706; }
+  .tier-positive { background: var(--green-light); border-left: 4px solid #16a34a; }
+
+  /* Metric ring */
+  .ring-wrap { position: relative; width: 100px; height: 100px; }
+  .ring-label { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: .75rem; }
+
+  /* Animations */
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  .fade-up { animation: fadeUp .35s ease both; }
+
+  /* Loading pulse */
+  .skeleton { background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%); background-size: 200% 100%; animation: pulse 1.4s infinite; border-radius: var(--radius-sm); }
+  @keyframes pulse { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+  /* Modal */
+  #modal { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: none; align-items: center; justify-content: center; padding: 1rem; z-index: 900; backdrop-filter: blur(2px); }
+  #modal.open { display: flex; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 999px; }
+</style>
+</head>
+<body>
+
+<!-- 3D Background Canvas (landing page only) -->
+<canvas id="bg-canvas"></canvas>
+
+<!-- Login overlay -->
+<div id="login-overlay">
+  <div style="max-width:900px;width:100%;display:grid;grid-template-columns:1fr 1fr;border-radius:16px;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,.35);" class="md:grid">
+    <!-- Left panel -->
+    <div style="background:linear-gradient(135deg,#1a3c34 0%,#2d6a4f 50%,#40916c 100%);color:#fff;padding:2.5rem;display:flex;flex-direction:column;justify-content:space-between;">
+      <div>
+        <div style="font-size:1.9rem;font-weight:700;letter-spacing:-.03em;margin-bottom:.5rem;">FacultyFlow</div>
+        <div style="font-size:.9rem;opacity:.75;font-weight:300;line-height:1.6;">Academic Intelligence Platform</div>
+      </div>
+      <div style="margin-top:2rem;">
+        <div style="font-size:1.1rem;font-weight:600;margin-bottom:.8rem;line-height:1.5;">
+          "AI drafts. <span style="font-style:italic;opacity:.85;">You decide.</span>"
+        </div>
+        <div style="display:flex;flex-direction:column;gap:.6rem;font-size:.82rem;opacity:.85;">
+          <div style="display:flex;align-items:center;gap:.6rem;"><span>📊</span> Real-time attendance analytics</div>
+          <div style="display:flex;align-items:center;gap:.6rem;"><span>⚠️</span> Early deficit detection</div>
+          <div style="display:flex;align-items:center;gap:.6rem;"><span>🤖</span> AI-assisted advisories</div>
+          <div style="display:flex;align-items:center;gap:.6rem;"><span>🔒</span> Role-based privacy controls</div>
+        </div>
+      </div>
+      <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid rgba(255,255,255,.2);font-size:.78rem;opacity:.6;">
+        Demo logins: <code style="font-size:.8rem;">meera@college.edu / faculty123</code><br>
+        <code style="font-size:.8rem;">hod@college.edu / admin123</code> &nbsp;·&nbsp; <code style="font-size:.8rem;">asha@college.edu / student123</code>
+      </div>
+    </div>
+    <!-- Right panel -->
+    <div style="background:rgba(255,255,255,.97);padding:2.5rem;display:flex;flex-direction:column;justify-content:center;gap:1.1rem;">
+      <div>
+        <h2 style="font-size:1.4rem;font-weight:700;color:#1c1917;margin-bottom:.25rem;">Welcome back</h2>
+        <p style="font-size:.85rem;color:#78716c;">Sign in to your institutional account</p>
+      </div>
+      <form id="lf" style="display:flex;flex-direction:column;gap:.85rem;">
+        <div>
+          <label style="display:block;font-size:.8rem;font-weight:600;color:#57534e;margin-bottom:.35rem;">Email address</label>
+          <input class="inp" name="email" type="email" placeholder="yourname@college.edu" required autocomplete="username">
+        </div>
+        <div>
+          <label style="display:block;font-size:.8rem;font-weight:600;color:#57534e;margin-bottom:.35rem;">Password</label>
+          <input class="inp" name="password" type="password" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <button id="lbtn" class="btn" style="margin-top:.3rem;padding:.65rem;font-size:.95rem;">Sign in</button>
+        <div id="lerr" style="display:none;padding:.6rem .8rem;background:#fde8e8;border:1px solid #fca5a5;border-radius:6px;font-size:.82rem;color:#c0392b;"></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Main app shell (hidden until login) -->
+<div id="app" style="display:none;position:relative;z-index:5;"></div>
+<div id="toast" class="fixed bottom-6 right-6 max-w-xs hidden px-4 py-3 rounded-lg text-white text-sm font-medium z-50 shadow-xl"></div>
+<div id="modal"></div>
+
+<!-- Chatbot -->
+<button id="chat-btn" title="FacultyFlow Assistant" style="display:none;">💬</button>
+<div id="chat-panel">
+  <div id="chat-header">
+    <span>🤖</span> FacultyFlow Assistant
+    <button onclick="toggleChat()" style="margin-left:auto;background:none;border:none;color:#fff;font-size:1.1rem;cursor:pointer;line-height:1;">×</button>
+  </div>
+  <div id="chat-messages"></div>
+  <div id="chat-input-row">
+    <input id="chat-input" placeholder="Ask me anything…" autocomplete="off">
+    <button id="chat-send" onclick="chatSend()">➤</button>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   THREE.JS — 3D Particle network background (landing page)
+═══════════════════════════════════════════════════════════════════ */
+(function() {
+  const canvas = document.getElementById('bg-canvas');
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.z = 50;
+
+  // Particles
+  const count = 180;
+  const positions = new Float32Array(count * 3);
+  const velocities = [];
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] = (Math.random() - .5) * 100;
+    positions[i * 3 + 1] = (Math.random() - .5) * 70;
+    positions[i * 3 + 2] = (Math.random() - .5) * 40;
+    velocities.push({ x: (Math.random() - .5) * .04, y: (Math.random() - .5) * .04, z: 0 });
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const mat = new THREE.PointsMaterial({ color: 0x40916c, size: .5, transparent: true, opacity: .7 });
+  const points = new THREE.Points(geo, mat);
+  scene.add(points);
+
+  // Connection lines
+  const lineMat = new THREE.LineBasicMaterial({ color: 0x2d6a4f, transparent: true, opacity: .18 });
+  const linesGroup = new THREE.Group();
+  scene.add(linesGroup);
+
+  function updateLines() {
+    while (linesGroup.children.length) linesGroup.remove(linesGroup.children[0]);
+    const pos = geo.attributes.position.array;
+    const threshold = 18;
+    for (let i = 0; i < count; i++) {
+      for (let j = i + 1; j < count; j++) {
+        const dx = pos[i*3] - pos[j*3];
+        const dy = pos[i*3+1] - pos[j*3+1];
+        const dz = pos[i*3+2] - pos[j*3+2];
+        const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        if (dist < threshold) {
+          const lineGeo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(pos[i*3], pos[i*3+1], pos[i*3+2]),
+            new THREE.Vector3(pos[j*3], pos[j*3+1], pos[j*3+2])
+          ]);
+          linesGroup.add(new THREE.Line(lineGeo, lineMat));
+        }
+      }
+    }
+  }
+
+  let frameCount = 0;
+  function animate() {
+    requestAnimationFrame(animate);
+    frameCount++;
+    const pos = geo.attributes.position.array;
+    for (let i = 0; i < count; i++) {
+      pos[i*3] += velocities[i].x;
+      pos[i*3+1] += velocities[i].y;
+      if (Math.abs(pos[i*3]) > 50) velocities[i].x *= -1;
+      if (Math.abs(pos[i*3+1]) > 35) velocities[i].y *= -1;
+    }
+    geo.attributes.position.needsUpdate = true;
+    if (frameCount % 3 === 0) updateLines();
+    points.rotation.y += .0008;
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+})();
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   APP STATE & HELPERS
+═══════════════════════════════════════════════════════════════════ */
+const S = {
+  token: sessionStorage.getItem('ff_token'),
+  user: JSON.parse(sessionStorage.getItem('ff_user') || 'null'),
+  courses: [], courseId: null, tab: null,
+  charts: {}
+};
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pct = v => v == null ? '–' : (+v).toFixed(1) + '%';
+
+function badge(t) {
+  if (t == null) return '';
+  const cls = {
+    'Critical': 'badge-critical', 'High': 'badge-critical',
+    'Advisory': 'badge-advisory', 'Medium': 'badge-advisory',
+    'Safe': 'badge-safe', 'Low': 'badge-safe', 'None': 'badge-safe',
+    'No Data': 'badge-nodata',
+    'urgent': 'badge-urgent',
+  }[t] || 'badge-safe';
+  return `<span class="badge ${cls}">${esc(t)}</span>`;
+}
+
+function toast(msg, ok = true) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.style.background = ok ? '#2d6a4f' : '#c0392b';
+  t.classList.remove('hidden');
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.add('hidden'), 4500);
+}
+
+function fmtErr(d) {
+  if (!d) return null;
+  if (typeof d === 'string') return d;
+  if (Array.isArray(d)) return d.map(e => (e.msg || '').replace(/^Value error, /, '') + (e.loc && !String(e.msg).startsWith('Value error') ? ` (${e.loc.slice(1).join('.')})` : '')).join('; ');
+  return JSON.stringify(d);
+}
+
+async function api(path, o = {}) {
+  const headers = { ...(o.headers || {}) };
+  if (S.token) headers.Authorization = 'Bearer ' + S.token;
+  if (o.json !== undefined) { headers['Content-Type'] = 'application/json'; o.body = JSON.stringify(o.json); }
+  const r = await fetch(path, { method: o.method, body: o.body, headers });
+  if (r.status === 401 && S.token) { logout(); throw new Error('Session expired. Please log in again.'); }
+  if (!r.ok) { let d; try { d = (await r.json()).detail; } catch (e) {} throw new Error(fmtErr(d) || r.statusText); }
+  return o.blob ? r.blob() : r.json();
+}
+
+const run = fn => async (...a) => { try { await fn(...a); } catch (e) { toast(e.message, false); } };
+
+function destroyCharts() {
+  Object.values(S.charts).forEach(c => c && c.destroy && c.destroy());
+  S.charts = {};
+}
+
+function logout() {
+  sessionStorage.clear();
+  S.token = null; S.user = null;
+  destroyCharts();
+  $('app').style.display = 'none';
+  document.getElementById('bg-canvas').style.display = 'block';
+  document.getElementById('login-overlay').style.display = 'flex';
+  $('chat-btn').style.display = 'none';
+  $('chat-panel').classList.remove('open');
+}
+
+/* attendance probability calculation */
+function calcClassesNeeded(attended, total, target = 75) {
+  if (total === 0) return null;
+  const pctNow = (attended / total) * 100;
+  if (pctNow >= target) {
+    // how many can be missed
+    const canMiss = Math.floor((attended - target / 100 * total) / (1 - target / 100));
+    return { status: 'above', canMiss: Math.max(0, canMiss), pct: pctNow };
+  }
+  // need: (attended + x)/(total + x) >= target/100
+  // x >= (target*total/100 - attended) / (1 - target/100)
+  const needed = Math.ceil((target * total / 100 - attended) / (1 - target / 100));
+  return { status: 'below', needed: Math.max(0, needed), pct: pctNow };
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   CHATBOT
+═══════════════════════════════════════════════════════════════════ */
+const BOT_INTROS = [
+  "Hello! I'm your FacultyFlow assistant 👋 Ask me about attendance, marks, deficits, reports, or how to use any feature.",
+];
+
+const BOT_KNOWLEDGE = [
+  { k: ['dashboard','overview','summary','home'],
+    r: "The **Dashboard** shows all courses at a glance — Critical, Advisory, and Low CIE counts per course. Great starting point!" },
+  { k: ['student','add student','enroll','upload'],
+    r: "In the **Students** tab, you can add students one by one or upload a CSV/Excel file with columns: usn, name, email." },
+  { k: ['attendance','mark','present','absent','upload attendance'],
+    r: "In the **Attendance** tab:\n• Select a date and mark Present/Absent per student\n• Or upload a CSV/Excel (columns: usn, date, status)" },
+  { k: ['marks','cie','internal','assessment','quiz','test','upload marks'],
+    r: "In the **Marks** tab:\n• Enter marks for one assessment at a time\n• Or upload a CSV (columns: usn, assessment, max_marks, marks)\n• Type **AB** for absent students" },
+  { k: ['deficit','attention','flag','critical','advisory','risk'],
+    r: "The **Needs Attention** tab shows flagged students. It has:\n• Attendance donut chart\n• Daily trend line chart\n• Probability of reaching 75%\n• 'Draft message' button to generate an AI advisory" },
+  { k: ['advisory','draft','message','note','ai','approve'],
+    r: "Advisory messages are **AI-drafted, teacher-approved**:\n1. Click 'Draft message' on a flagged student\n2. The AI generates a tone-appropriate message\n3. You edit it\n4. Click 'Approve and Save' — only then does the student see it" },
+  { k: ['report','download','pdf','excel','xlsx'],
+    r: "In **Reports** tab, download:\n• Attendance report\n• CIE performance report\n• Deficit/follow-up list\nFormats: PDF or Excel. Filters: date range, status." },
+  { k: ['admin','threshold','setting','critical below','advisory upto'],
+    r: "In the **Admin** tab:\n• Add users and courses\n• Change deficit thresholds (default: Critical <75%, Advisory 75-85%, CIE cutoff <40%)" },
+  { k: ['student portal','student view','student login'],
+    r: "Students log in with their email and can view: attendance %, CIE %, and any **approved** advisory notes from their faculty." },
+  { k: ['tier','urgent','serious','message tone','different note','50%','70%','85%'],
+    r: "Advisory notes use **4 tiers based on attendance**:\n• <50%: Urgent (exam eligibility risk)\n• 50-74%: Critical concern\n• 75-85%: Advisory (borderline)\n• >85%: Positive (focus on marks)" },
+  { k: ['template','csv template','sample file'],
+    r: "Download blank CSV templates:\n• Students: `/templates/students`\n• Attendance: `/templates/attendance`\n• Marks: `/templates/marks`" },
+  { k: ['health','server','status'],
+    r: "Check server health at: `/health` — it shows database connection status." },
+  { k: ['probability','how many classes','classes to attend','need to attend'],
+    r: "The **Needs Attention** tab shows each flagged student's probability panel — it calculates exactly how many consecutive classes they must attend to reach 75% (or how many they can still miss if above 75%)." },
+  { k: ['login','sign in','demo','credentials','password'],
+    r: "Demo accounts:\n• Faculty: meera@college.edu / faculty123\n• Admin: hod@college.edu / admin123\n• Student: asha@college.edu / student123" },
+];
+
+function chatBotReply(msg) {
+  const m = msg.toLowerCase();
+  for (const { k, r } of BOT_KNOWLEDGE) {
+    if (k.some(kw => m.includes(kw))) return r;
+  }
+  return "I'm not sure about that. Try asking about: **attendance**, **marks**, **deficits**, **advisories**, **reports**, **admin settings**, or **probability calculations**. 🙂";
+}
+
+function chatAddMsg(text, who) {
+  const box = $('chat-messages');
+  const div = document.createElement('div');
+  div.className = `chat-msg chat-${who}`;
+  div.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function chatSend() {
+  const inp = $('chat-input');
+  const msg = inp.value.trim();
+  if (!msg) return;
+  inp.value = '';
+  chatAddMsg(msg, 'user');
+  setTimeout(() => chatAddMsg(chatBotReply(msg), 'bot'), 350);
+}
+
+function toggleChat() {
+  const p = $('chat-panel');
+  if (p.classList.toggle('open') && $('chat-messages').children.length === 0) {
+    BOT_INTROS.forEach(t => chatAddMsg(t, 'bot'));
+  }
+}
+
+$('chat-input').addEventListener('keydown', e => { if (e.key === 'Enter') chatSend(); });
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   LOGIN
+═══════════════════════════════════════════════════════════════════ */
+$('lf').onsubmit = async e => {
+  e.preventDefault();
+  const btn = $('lbtn'); const err = $('lerr');
+  btn.innerHTML = '<span class="spinner"></span>Signing in…'; btn.disabled = true;
+  err.style.display = 'none';
+  try {
+    const f = new FormData(e.target);
+    const r = await api('/auth/login', { method: 'POST', json: { email: f.get('email'), password: f.get('password') } });
+    S.token = r.token; S.user = r.user;
+    sessionStorage.setItem('ff_token', r.token); sessionStorage.setItem('ff_user', JSON.stringify(r.user));
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('bg-canvas').style.display = 'none';
+    $('app').style.display = 'block';
+    $('chat-btn').style.display = 'flex';
+    await start();
+  } catch (ex) {
+    err.textContent = ex.message || 'Login failed. Please check your credentials.';
+    err.style.display = 'block';
+    btn.innerHTML = 'Sign in'; btn.disabled = false;
+  }
+};
+
+// Auto-login if token in session
+if (S.token && S.user) {
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('bg-canvas').style.display = 'none';
+  $('app').style.display = 'block';
+  $('chat-btn').style.display = 'flex';
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   SHELL
+═══════════════════════════════════════════════════════════════════ */
+async function start() {
+  if (!S.token) return;
+  if (S.user.role === 'student') return renderStudent();
+  try { S.courses = await api('/courses'); } catch (e) { S.courses = []; }
+  S.courseId = S.courses[0]?.course_id ?? null;
+  S.tab = 'dashboard';
+  renderShell();
+}
+
+function tabsFor() {
+  const t = [['dashboard','Dashboard'],['students','Students'],['attendance','Attendance'],
+             ['marks','Marks'],['deficits','Needs Attention'],['reports','Reports']];
+  if (S.user.role === 'admin') t.push(['admin','Admin']);
+  return t;
+}
+
+function renderShell() {
+  $('app').innerHTML = `
+  <header style="background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:40;">
+    <div style="max-width:1200px;margin:0 auto;padding:.75rem 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:.75rem;">
+        <span style="font-size:1.15rem;font-weight:700;color:var(--accent);letter-spacing:-.03em;">FacultyFlow</span>
+        <select id="cs" class="inp" style="width:auto;font-size:.82rem;background:var(--surface2);">
+          ${S.courses.map(c => `<option value="${c.course_id}" ${c.course_id==S.courseId?'selected':''}>${esc(c.course_code)} · ${esc(c.course_name)}</option>`).join('')||'<option>No courses</option>'}
+        </select>
+      </div>
+      <div style="display:flex;align-items:center;gap:.75rem;">
+        <span style="font-size:.8rem;font-weight:500;color:var(--text2);background:var(--surface2);padding:.3rem .75rem;border-radius:999px;border:1px solid var(--border);">
+          ${esc(S.user.name)} <span style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;opacity:.6;">${S.user.role}</span>
+        </span>
+        <button class="btn-ghost" style="font-size:.78rem;padding:.35rem .8rem;" onclick="logout()">Log out</button>
+      </div>
+    </div>
+    <nav style="max-width:1200px;margin:0 auto;padding:0 1.25rem;display:flex;overflow-x:auto;border-top:1px solid var(--border);">
+      ${tabsFor().map(([k,l])=>`<button class="tab${k==S.tab?' on':''}" data-t="${k}">${l}</button>`).join('')}
+    </nav>
+  </header>
+  <main id="main" style="max-width:1200px;margin:0 auto;padding:1.5rem 1.25rem;"></main>`;
+
+  $('cs')?.addEventListener('change', e => { S.courseId = +e.target.value; show(); });
+  document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { S.tab = b.dataset.t; renderShell(); }));
+  show();
+}
+
+const views = {};
+const show = run(async () => {
+  destroyCharts();
+  if (!S.courseId && !['dashboard','admin'].includes(S.tab)) {
+    $('main').innerHTML = `<div class="card empty-state"><div style="font-size:2.5rem;margin-bottom:.75rem;">📚</div><div style="font-weight:600;font-size:1.05rem;color:var(--text);">No course assigned</div><p style="color:var(--text2);margin-top:.4rem;font-size:.875rem;">Ask an Admin to assign you a course, or go to the Admin tab to create one.</p></div>`;
+    return;
+  }
+  $('main').innerHTML = `<div style="display:flex;align-items:center;justify-content:center;padding:4rem;gap:.75rem;color:var(--text3);">
+    <div class="spinner" style="border-top-color:var(--accent);border-color:var(--border);"></div>
+    <span style="font-size:.875rem;">Loading…</span></div>`;
+  await views[S.tab]();
+});
+
+function closeModal() { const m=$('modal'); m.classList.remove('open'); m.innerHTML=''; }
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeModal(); });
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   DASHBOARD
+═══════════════════════════════════════════════════════════════════ */
+views.dashboard = async () => {
+  const d = await api('/dashboard');
+  const totalStudents = d.reduce((s,c) => s + c.student_count, 0);
+  const totalFlagged  = d.reduce((s,c) => s + c.flagged, 0);
+  const totalCritical = d.reduce((s,c) => s + c.critical, 0);
+
+  $('main').innerHTML = `
+  <div style="margin-bottom:1.25rem;">
+    <h2 style="font-size:1.3rem;font-weight:700;color:var(--text);">Department Overview</h2>
+    <p style="font-size:.82rem;color:var(--text2);margin-top:.2rem;">Academic health across all courses</p>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:1rem;margin-bottom:1.5rem;">
+    <div class="stat-card fade-up">
+      <div class="stat-value" style="color:var(--accent);">${d.length}</div>
+      <div class="stat-label">Active Courses</div>
+    </div>
+    <div class="stat-card fade-up" style="animation-delay:.05s">
+      <div class="stat-value">${totalStudents}</div>
+      <div class="stat-label">Total Students</div>
+    </div>
+    <div class="stat-card fade-up" style="animation-delay:.1s">
+      <div class="stat-value" style="color:var(--red);">${totalCritical}</div>
+      <div class="stat-label">Critical Attendance</div>
+    </div>
+    <div class="stat-card fade-up" style="animation-delay:.15s">
+      <div class="stat-value" style="color:var(--orange);">${totalFlagged}</div>
+      <div class="stat-label">Total Flagged</div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
+    <div class="card fade-up" style="animation-delay:.2s;">
+      <div style="font-weight:600;font-size:.95rem;margin-bottom:1rem;color:var(--text);">Course Breakdown</div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;">
+          <thead><tr>
+            <th>Course</th><th>Faculty</th><th>Students</th>
+            <th>Critical</th><th>Advisory</th><th>Low CIE</th><th>Flagged</th>
+          </tr></thead>
+          <tbody>
+          ${d.length ? d.map(c => `
+            <tr>
+              <td style="font-weight:500;">${esc(c.course_code)} <span style="color:var(--text2);font-weight:400;">· ${esc(c.course_name)}</span></td>
+              <td style="color:var(--text2);">${esc(c.faculty_name)}</td>
+              <td>${c.student_count}</td>
+              <td>${badge('Critical')} <span style="font-weight:600;color:var(--red);">${c.critical}</span></td>
+              <td>${badge('Advisory')} <span style="font-weight:600;color:var(--orange);">${c.advisory}</span></td>
+              <td>${c.low_cie}</td>
+              <td style="font-weight:700;color:${c.flagged?'var(--red)':'var(--accent)'};">${c.flagged}</td>
+            </tr>`).join('') : `<tr><td colspan="7" class="empty-state">No courses yet. Add courses in the Admin tab.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card fade-up" style="animation-delay:.25s;">
+      <div style="font-weight:600;font-size:.95rem;margin-bottom:.75rem;color:var(--text);">Flag Distribution</div>
+      <div style="position:relative;height:200px;">
+        <canvas id="dash-chart"></canvas>
+      </div>
+    </div>
+  </div>`;
+
+  if (d.length) {
+    S.charts.dash = new Chart($('dash-chart'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Critical', 'Advisory', 'Low CIE', 'Safe'],
+        datasets: [{ data: [
+          d.reduce((s,c)=>s+c.critical,0),
+          d.reduce((s,c)=>s+c.advisory,0),
+          d.reduce((s,c)=>s+c.low_cie,0),
+          totalStudents - totalFlagged
+        ], backgroundColor: ['#c0392b','#c05621','#92400e','#2d6a4f'], borderWidth: 2, borderColor: '#fff' }]
+      },
+      options: { responsive:true, maintainAspectRatio:false, plugins: { legend: { position:'bottom', labels:{ boxWidth:12, font:{size:11} } } } }
+    });
+  }
+};
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   STUDENTS
+═══════════════════════════════════════════════════════════════════ */
+views.students = async () => {
+  const st = await api(`/courses/${S.courseId}/students`);
+  $('main').innerHTML = `
+  <div style="display:grid;grid-template-columns:1fr 300px;gap:1.25rem;">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+        <div>
+          <div style="font-weight:600;font-size:.95rem;">Enrolled Students</div>
+          <div style="font-size:.78rem;color:var(--text2);margin-top:.15rem;">${st.length} student${st.length!==1?'s':''} enrolled</div>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;">
+          <thead><tr><th>USN</th><th>Name</th><th>Email</th><th style="text-align:right;">Action</th></tr></thead>
+          <tbody>
+            ${st.length ? st.map(s=>`<tr>
+              <td style="font-family:monospace;font-size:.82rem;font-weight:600;">${esc(s.usn)}</td>
+              <td style="font-weight:500;">${esc(s.name)}</td>
+              <td style="color:var(--text2);">${esc(s.email||'–')}</td>
+              <td style="text-align:right;"><button class="btn-ghost" style="font-size:.75rem;padding:.25rem .65rem;color:var(--red);border-color:#fca5a5;" data-del="${s.student_id}" data-name="${esc(s.name)}">Remove</button></td>
+            </tr>`).join('') : `<tr><td colspan="4" class="empty-state">No students yet. Add a student or upload a class list.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:1rem;">
+      <form id="sf" class="card" style="gap:.85rem;display:flex;flex-direction:column;">
+        <div style="font-weight:600;font-size:.9rem;color:var(--text);">Add Student</div>
+        <div><label style="font-size:.78rem;font-weight:600;color:var(--text2);display:block;margin-bottom:.3rem;">USN</label>
+          <input class="inp" name="usn" placeholder="e.g. 1XX23CS001" required></div>
+        <div><label style="font-size:.78rem;font-weight:600;color:var(--text2);display:block;margin-bottom:.3rem;">Full Name</label>
+          <input class="inp" name="name" placeholder="Student name" required></div>
+        <div><label style="font-size:.78rem;font-weight:600;color:var(--text2);display:block;margin-bottom:.3rem;">Email (optional)</label>
+          <input class="inp" name="email" type="email" placeholder="student@college.edu"></div>
+        <button id="sbtn" class="btn">Add Student</button>
+      </form>
+      <form id="uf" class="card" style="gap:.75rem;display:flex;flex-direction:column;">
+        <div style="font-weight:600;font-size:.9rem;">Upload Class List</div>
+        <p style="font-size:.77rem;color:var(--text2);">CSV/Excel with columns: <code>usn, name, email</code></p>
+        <input type="file" name="file" accept=".csv,.xlsx" required class="inp" style="padding:.4rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <button id="ubtn" class="btn" style="font-size:.8rem;">Upload</button>
+          <a href="/templates/students" style="font-size:.78rem;color:var(--accent);text-decoration:underline;">Template</a>
+        </div>
+        <div id="up" style="font-size:.78rem;"></div>
+      </form>
+    </div>
+  </div>`;
+
+  $('sf').onsubmit = run(async e => {
+    e.preventDefault(); const btn=$('sbtn'); btn.disabled=true; btn.textContent='Adding…';
+    try { await api(`/courses/${S.courseId}/students`,{method:'POST',json:Object.fromEntries(new FormData(e.target))}); toast('Student added'); show(); }
+    finally { btn.disabled=false; btn.textContent='Add Student'; }
+  });
+  $('uf').onsubmit = run(async e => {
+    e.preventDefault(); const btn=$('ubtn'); btn.disabled=true; btn.textContent='Uploading…';
+    try { const r=await api(`/courses/${S.courseId}/students/upload`,{method:'POST',body:new FormData(e.target)}); showUpload(r,'up'); if(r.imported>0){toast(`Imported ${r.imported} student(s)`);setTimeout(show,1200);} }
+    finally { btn.disabled=false; btn.textContent='Upload'; }
+  });
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = run(async () => {
+    const ok = await confirmDlg(`Remove ${b.dataset.name} and all their records?`);
+    if (!ok) return;
+    await api(`/courses/${S.courseId}/students/${b.dataset.del}`,{method:'DELETE'}); toast('Student removed'); show();
+  }));
+};
+
+function showUpload(r, elId='up') {
+  const el = $(elId);
+  el.innerHTML = `<div style="margin-top:.5rem;padding:.6rem .75rem;border-radius:6px;background:var(--surface2);border:1px solid var(--border);">
+    <div style="font-weight:500;">${r.imported} added · ${r.updated} updated · <span style="color:${r.errors.length?'var(--red)':'var(--accent)'};">${r.errors.length} errors</span></div>
+    ${r.errors.slice(0,4).map(e=>`<div style="color:var(--red);margin-top:.2rem;">Row ${e.row}: ${esc(e.error)}</div>`).join('')}
+    ${r.errors.length>4?`<div style="color:var(--text2);">…and ${r.errors.length-4} more</div>`:''}
+  </div>`;
+}
+
+function confirmDlg(msg) {
+  return new Promise(resolve => {
+    const m = $('modal'); m.classList.add('open');
+    m.innerHTML = `<div class="card" style="max-width:380px;width:100%;box-shadow:var(--shadow-lg);">
+      <div style="font-weight:600;margin-bottom:.5rem;">Confirm action</div>
+      <p style="font-size:.875rem;color:var(--text2);margin-bottom:1.25rem;">${esc(msg)}</p>
+      <div style="display:flex;justify-content:flex-end;gap:.6rem;">
+        <button class="btn-ghost" id="cd-no">Cancel</button>
+        <button class="btn btn-danger" id="cd-yes">Confirm</button>
+      </div></div>`;
+    $('cd-no').onclick = () => { closeModal(); resolve(false); };
+    $('cd-yes').onclick = () => { closeModal(); resolve(true); };
+  });
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   ATTENDANCE
+═══════════════════════════════════════════════════════════════════ */
+views.attendance = async () => {
+  const today = new Date().toISOString().slice(0,10);
+  const [st, sm] = await Promise.all([api(`/courses/${S.courseId}/students`), api(`/courses/${S.courseId}/summary`)]);
+  if (!st.length) { $('main').innerHTML=`<div class="card empty-state"><div style="font-size:2rem;margin-bottom:.5rem;">👥</div><div style="font-weight:600;">No students in this course</div><p style="color:var(--text2);font-size:.85rem;margin-top:.3rem;">Add or upload students first.</p></div>`; return; }
+
+  $('main').innerHTML = `
+  <div style="display:grid;grid-template-columns:1fr 280px;gap:1.25rem;">
+    <div class="card">
+      <div style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:.75rem;margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid var(--border);">
+        <div>
+          <label style="font-size:.78rem;font-weight:600;color:var(--text2);display:block;margin-bottom:.3rem;">Attendance Date</label>
+          <input id="ad" type="date" class="inp" style="width:160px;" value="${today}" max="${today}">
+        </div>
+        <div style="display:flex;gap:.5rem;align-items:center;">
+          <button class="btn-ghost" style="font-size:.8rem;" id="allp">Mark all present</button>
+          <button class="btn" style="font-size:.8rem;" id="sv">Save attendance</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto;max-height:420px;overflow-y:auto;">
+        <table style="width:100%;">
+          <thead><tr><th>USN</th><th>Name</th><th style="width:60px;text-align:center;">Present</th></tr></thead>
+          <tbody>
+            ${st.map(s=>`<tr>
+              <td style="font-family:monospace;font-size:.8rem;font-weight:600;">${esc(s.usn)}</td>
+              <td style="font-weight:500;">${esc(s.name)}</td>
+              <td style="text-align:center;"><input type="checkbox" class="pc" data-id="${s.student_id}" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer;"></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:1rem;">
+      <div class="card">
+        <div style="font-weight:600;font-size:.9rem;margin-bottom:.75rem;">Attendance Summary</div>
+        <div style="display:flex;flex-direction:column;gap:.6rem;max-height:320px;overflow-y:auto;">
+          ${sm.map(r => {
+            const cls = r.attendance_pct < 50 ? 'var(--red)' : r.attendance_pct < 75 ? '#c05621' : r.attendance_pct <= 85 ? '#92400e' : 'var(--accent)';
+            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:.45rem .6rem;border-radius:6px;background:var(--surface2);border:1px solid var(--border);">
+              <span style="font-size:.8rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;" title="${esc(r.name)}">${esc(r.name)}</span>
+              <span style="font-size:.8rem;font-weight:700;color:${cls};">${pct(r.attendance_pct)}</span>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+      <form id="uf" class="card" style="gap:.7rem;display:flex;flex-direction:column;">
+        <div style="font-weight:600;font-size:.9rem;">Bulk Upload</div>
+        <p style="font-size:.77rem;color:var(--text2);">Columns: <code>usn, date, status</code></p>
+        <input type="file" name="file" accept=".csv,.xlsx" required class="inp" style="padding:.4rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <button id="abtn" class="btn" style="font-size:.8rem;">Upload</button>
+          <a href="/templates/attendance" style="font-size:.78rem;color:var(--accent);text-decoration:underline;">Template</a>
+        </div>
+        <div id="aup" style="font-size:.78rem;"></div>
+      </form>
+    </div>
+  </div>`;
+
+  const boxes = () => [...document.querySelectorAll('.pc')];
+  const load = run(async () => {
+    const rec = await api(`/courses/${S.courseId}/attendance?date=${$('ad').value}`);
+    const m = Object.fromEntries(rec.map(r=>[r.student_id,r.status]));
+    boxes().forEach(b => b.checked = m[b.dataset.id]==='Present');
+  });
+  $('ad').addEventListener('change', load); load();
+  $('allp').onclick = () => boxes().forEach(b=>b.checked=true);
+  $('sv').onclick = run(async () => {
+    const btn=$('sv'); btn.disabled=true; btn.textContent='Saving…';
+    try { await api('/attendance',{method:'POST',json:{course_id:S.courseId,date:$('ad').value,records:boxes().map(b=>({student_id:+b.dataset.id,status:b.checked?'Present':'Absent'}))}}); toast('Attendance saved'); show(); }
+    finally { btn.disabled=false; btn.textContent='Save attendance'; }
+  });
+  $('uf').onsubmit = run(async e => {
+    e.preventDefault(); const btn=$('abtn'); btn.disabled=true; btn.textContent='Uploading…';
+    try { const r=await api(`/attendance/upload?course_id=${S.courseId}`,{method:'POST',body:new FormData(e.target)}); showUpload(r,'aup'); if(r.imported>0||r.updated>0){toast(`${r.imported} inserted, ${r.updated} updated`);setTimeout(show,1200);} }
+    finally { btn.disabled=false; btn.textContent='Upload'; }
+  });
+};
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   MARKS
+═══════════════════════════════════════════════════════════════════ */
+views.marks = async () => {
+  const [st, mt] = await Promise.all([api(`/courses/${S.courseId}/students`), api(`/courses/${S.courseId}/marks`)]);
+  if (!st.length) { $('main').innerHTML=`<div class="card empty-state"><div style="font-size:2rem;">📝</div><div style="font-weight:600;">No students yet</div></div>`; return; }
+
+  $('main').innerHTML = `
+  <div style="display:grid;grid-template-columns:1fr 280px;gap:1.25rem;margin-bottom:1.25rem;">
+    <div class="card">
+      <div style="font-weight:600;font-size:.95rem;margin-bottom:.75rem;">Record Assessment Marks</div>
+      <div style="display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:.85rem;padding:.85rem;background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border);">
+        <div style="flex:1;min-width:140px;">
+          <label style="font-size:.78rem;font-weight:600;color:var(--text2);display:block;margin-bottom:.3rem;">Assessment Name</label>
+          <input id="an" class="inp" placeholder="e.g. Test 1 · Quiz 2">
+        </div>
+        <div style="width:110px;">
+          <label style="font-size:.78rem;font-weight:600;color:var(--text2);display:block;margin-bottom:.3rem;">Max Marks</label>
+          <input id="mx" type="number" min="1" step="any" class="inp" placeholder="25">
+        </div>
+        <div style="display:flex;align-items:flex-end;">
+          <button id="sm" class="btn">Save Marks</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto;max-height:380px;overflow-y:auto;">
+        <table style="width:100%;">
+          <thead><tr><th>USN</th><th>Name</th><th style="width:110px;">Score</th><th style="width:70px;text-align:center;">AB</th></tr></thead>
+          <tbody>
+            ${st.map(s=>`<tr>
+              <td style="font-family:monospace;font-size:.8rem;font-weight:600;">${esc(s.usn)}</td>
+              <td style="font-weight:500;">${esc(s.name)}</td>
+              <td><input type="number" min="0" step="any" class="inp mk" style="padding:.3rem .5rem;" data-id="${s.student_id}"></td>
+              <td style="text-align:center;"><input type="checkbox" class="ab" style="width:17px;height:17px;accent-color:var(--accent);cursor:pointer;" data-id="${s.student_id}"></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <form id="mf" class="card" style="display:flex;flex-direction:column;gap:.7rem;align-self:start;">
+      <div style="font-weight:600;font-size:.9rem;">Bulk Upload</div>
+      <p style="font-size:.77rem;color:var(--text2);">Columns: <code>usn, assessment, max_marks, marks</code> (AB for absent)</p>
+      <input type="file" name="file" accept=".csv,.xlsx" required class="inp" style="padding:.4rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <button id="mubtn" class="btn" style="font-size:.8rem;">Upload</button>
+        <a href="/templates/marks" style="font-size:.78rem;color:var(--accent);text-decoration:underline;">Template</a>
+      </div>
+      <div id="mup" style="font-size:.78rem;"></div>
+    </form>
+  </div>
+
+  <div class="card">
+    <div style="font-weight:600;font-size:.95rem;margin-bottom:.85rem;">All Assessments</div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;">
+        <thead><tr><th>USN</th><th>Name</th>${mt.assessments.map(a=>`<th>${esc(a)}</th>`).join('')}<th>CIE %</th></tr></thead>
+        <tbody>
+          ${mt.rows.length ? mt.rows.map(r=>`<tr>
+            <td style="font-family:monospace;font-size:.8rem;font-weight:600;">${esc(r.usn)}</td>
+            <td style="font-weight:500;">${esc(r.name)}</td>
+            ${mt.assessments.map(a=>`<td style="color:${r.cells[a]==='AB'?'var(--orange)':'var(--text)'};">${esc(r.cells[a]??'–')}</td>`).join('')}
+            <td style="font-weight:600;color:${r.cie_pct!=null&&r.cie_pct<40?'var(--red)':r.cie_pct!=null&&r.cie_pct<60?'var(--orange)':'var(--accent)'};">${pct(r.cie_pct)}</td>
+          </tr>`).join('') : `<tr><td colspan="${3+mt.assessments.length}" class="empty-state">No assessments yet.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+
+  $('sm').onclick = run(async () => {
+    const an=$('an').value.trim(), mx=+$('mx').value;
+    if(!an){toast('Enter an assessment name',false);return;}
+    if(!mx||mx<=0){toast('Maximum marks must be > 0',false);return;}
+    const btn=$('sm'); btn.disabled=true; btn.textContent='Saving…';
+    try {
+      const records=st.map(s=>{const v=document.querySelector(`.mk[data-id="${s.student_id}"]`).value;const ab=document.querySelector(`.ab[data-id="${s.student_id}"]`).checked;return{student_id:s.student_id,absent:ab,marks_obtained:ab||v===''?null:+v};});
+      await api('/marks',{method:'POST',json:{course_id:S.courseId,assessment_name:an,max_marks:mx,records}});
+      toast('Marks saved'); show();
+    } finally { btn.disabled=false; btn.textContent='Save Marks'; }
+  });
+  $('mf').onsubmit = run(async e => {
+    e.preventDefault(); const btn=$('mubtn'); btn.disabled=true; btn.textContent='Uploading…';
+    try { const r=await api(`/marks/upload?course_id=${S.courseId}`,{method:'POST',body:new FormData(e.target)}); showUpload(r,'mup'); if(r.imported>0||r.updated>0){toast(`${r.imported} added, ${r.updated} updated`);setTimeout(show,1200);} }
+    finally { btn.disabled=false; btn.textContent='Upload'; }
+  });
+};
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   DEFICITS + PROBABILITY + TREND
+═══════════════════════════════════════════════════════════════════ */
+views.deficits = async () => {
+  const [d, sm, trend] = await Promise.all([
+    api(`/courses/${S.courseId}/deficits`),
+    api(`/courses/${S.courseId}/summary`),
+    api(`/courses/${S.courseId}/attendance-trend`).catch(()=>[])
+  ]);
+  const cnt = k => sm.filter(r=>r.attendance_status===k).length;
+
+  $('main').innerHTML = `
+  <div style="display:grid;grid-template-columns:180px 1fr 1fr;gap:1rem;margin-bottom:1.25rem;">
+    <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;">
+      <div style="font-weight:600;font-size:.85rem;margin-bottom:.6rem;color:var(--text2);">Attendance Split</div>
+      <div style="position:relative;height:130px;width:130px;">
+        <canvas id="ch-donut"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div style="font-weight:600;font-size:.85rem;margin-bottom:.6rem;color:var(--text2);">Daily Class Trend (%)</div>
+      <div style="position:relative;height:130px;">
+        <canvas id="ch-trend"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div style="font-weight:600;font-size:.85rem;margin-bottom:.6rem;color:var(--text2);">Quick Stats</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;">
+        ${[
+          ['Critical', cnt('Critical'), 'var(--red)'],
+          ['Advisory', cnt('Advisory'), 'var(--orange)'],
+          ['Safe', cnt('Safe'), 'var(--accent)'],
+          ['Flagged', d.length, '#374151'],
+        ].map(([l,v,c])=>`<div style="padding:.6rem;background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border);">
+          <div style="font-size:1.3rem;font-weight:700;color:${c};">${v}</div>
+          <div style="font-size:.72rem;font-weight:500;color:var(--text2);margin-top:.1rem;">${l}</div>
+        </div>`).join('')}
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:1.25rem;">
+    <div style="font-weight:600;font-size:.95rem;margin-bottom:.85rem;">Flagged Students — Needs Attention (${d.length})</div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;">
+        <thead><tr><th>Priority</th><th>USN</th><th>Name</th><th>Attendance</th><th>Classes to 75%</th><th>CIE</th><th>Flags</th><th style="text-align:right;">Action</th></tr></thead>
+        <tbody>
+          ${d.length ? d.map(r => {
+            const prob = calcClassesNeeded(r.attended, r.total_classes, 75);
+            let probHtml = '–';
+            if (prob) {
+              if (prob.status === 'above') {
+                probHtml = `<span style="color:var(--accent);font-size:.78rem;font-weight:600;">Can miss ${prob.canMiss}</span>`;
+              } else {
+                const barPct = Math.min(100, (prob.pct / 75) * 100);
+                probHtml = `<div style="font-size:.75rem;font-weight:600;color:var(--red);">Need ${prob.needed} more</div>
+                  <div class="prob-bar-wrap" style="margin-top:.3rem;width:80px;">
+                    <div class="prob-bar" style="width:${barPct}%;background:${prob.pct<50?'#c0392b':prob.pct<75?'#c05621':'#2d6a4f'};"></div>
+                  </div>`;
+              }
+            }
+            return `<tr>
+              <td>${badge(r.priority)}</td>
+              <td style="font-family:monospace;font-size:.8rem;font-weight:600;">${esc(r.usn)}</td>
+              <td style="font-weight:500;">${esc(r.name)}</td>
+              <td style="font-weight:600;color:${r.attendance_pct<50?'var(--red)':r.attendance_pct<75?'var(--orange)':'var(--amber)'};">
+                ${pct(r.attendance_pct)} ${badge(r.attendance_status)}
+              </td>
+              <td>${probHtml}</td>
+              <td style="color:${r.cie_pct!=null&&r.cie_pct<40?'var(--red)':'var(--text2)'};">${pct(r.cie_pct)}</td>
+              <td style="font-size:.78rem;color:var(--text2);max-width:200px;line-height:1.5;">${r.reasons.map(esc).join('<br>')}</td>
+              <td style="text-align:right;">
+                <button class="btn" style="font-size:.75rem;padding:.35rem .75rem;" data-s="${r.student_id}" data-n="${esc(r.name)}" data-att="${r.attendance_pct??''}">Draft advisory</button>
+              </td>
+            </tr>`;
+          }).join('') : `<tr><td colspan="8" class="empty-state" style="color:var(--accent);">🎉 All students are in good standing!</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+
+  // Donut
+  S.charts.donut = new Chart($('ch-donut'), {
+    type: 'doughnut',
+    data: { labels: ['Critical','Advisory','Safe','No Data'], datasets: [{ data:[cnt('Critical'),cnt('Advisory'),cnt('Safe'),cnt('No Data')], backgroundColor:['#c0392b','#c05621','#2d6a4f','#9ca3af'], borderWidth:2, borderColor:'#fff' }] },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, cutout:'65%' }
+  });
+
+  // Trend line
+  S.charts.trend = new Chart($('ch-trend'), {
+    type: 'line',
+    data: {
+      labels: trend.map(t=>t.date),
+      datasets: [{
+        label: 'Class %', data: trend.map(t=>t.percentage),
+        borderColor: '#2d6a4f', backgroundColor: 'rgba(45,106,79,.1)',
+        fill: true, tension: .3, pointRadius: 2.5, borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { y: { min:0, max:100, ticks:{ callback:v=>v+'%', font:{size:10} } }, x: { ticks:{ maxRotation:40, font:{size:10} } } },
+      plugins: { legend:{ display:false } }
+    }
+  });
+
+  document.querySelectorAll('[data-s]').forEach(b => b.onclick = () => openAdvisory(+b.dataset.s, b.dataset.n, parseFloat(b.dataset.att)||null));
+};
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   ADVISORY MODAL — Tiered by attendance
+═══════════════════════════════════════════════════════════════════ */
+function getTierInfo(att) {
+  if (att == null || isNaN(att)) return { label: 'General Advisory', color: '#374151', bg: '#f8f9fa', border: '#6b7280', cls: '' };
+  if (att < 50)   return { label: '🚨 URGENT — Exam eligibility at risk', color: '#7f1d1d', bg: '#fff1f2', border: '#be123c', cls: 'tier-urgent' };
+  if (att < 75)   return { label: '⛔ Critical — Below institute minimum (75%)', color: '#c0392b', bg: '#fde8e8', border: '#dc2626', cls: 'tier-critical' };
+  if (att <= 85)  return { label: '⚠️ Advisory — Borderline attendance (75-85%)', color: '#92400e', bg: '#fef9c3', border: '#d97706', cls: 'tier-advisory' };
+  return           { label: '✅ Positive — Good attendance, focus on marks', color: '#166534', bg: '#dcfce7', border: '#16a34a', cls: 'tier-positive' };
+}
+
+function openAdvisory(sid, name, att) {
+  const tier = getTierInfo(att);
+  const m = $('modal'); m.classList.add('open');
+  m.innerHTML = `
+  <div class="card" style="max-width:640px;width:100%;box-shadow:var(--shadow-lg);border-radius:12px;padding:0;overflow:hidden;">
+    <div style="padding:1.25rem 1.4rem;background:${tier.color};color:#fff;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-weight:700;font-size:1rem;">Advisory for ${esc(name)}</div>
+          <div style="font-size:.8rem;opacity:.85;margin-top:.15rem;">${tier.label}</div>
+        </div>
+        <button onclick="closeModal()" style="background:none;border:none;color:rgba(255,255,255,.8);font-size:1.3rem;cursor:pointer;line-height:1;">×</button>
+      </div>
+    </div>
+    <div style="padding:1.25rem 1.4rem;display:flex;flex-direction:column;gap:1rem;">
+      <div style="padding:.75rem;background:${tier.bg};border:1.5px solid ${tier.border};border-radius:8px;font-size:.82rem;color:${tier.color};">
+        <strong>Attendance:</strong> ${att!=null?pct(att):'N/A'} &nbsp;|&nbsp; Tier: ${tier.label}
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:.75rem;flex-wrap:wrap;">
+        <div style="flex:1;min-width:160px;">
+          <label style="font-size:.78rem;font-weight:600;color:var(--text2);display:block;margin-bottom:.3rem;">Issue Type</label>
+          <select id="it" class="inp">
+            <option value="attendance">Attendance shortage</option>
+            <option value="marks">Low internal marks</option>
+          </select>
+        </div>
+        <button class="btn" id="gen">Generate AI draft</button>
+      </div>
+      <div id="dr" style="display:flex;flex-direction:column;gap:.75rem;"></div>
+      <div style="display:flex;justify-content:flex-end;border-top:1px solid var(--border);padding-top:.85rem;">
+        <button class="btn-ghost" onclick="closeModal()">Close</button>
+      </div>
+    </div>
+  </div>`;
+
+  $('gen').onclick = run(async () => {
+    const btn=$('gen'); btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Generating…';
+    try {
+      const r = await api('/advisories/draft',{method:'POST',json:{student_id:sid,course_id:S.courseId,issue_type:$('it').value}});
+      const rTier = getTierInfo(r.attendance_pct);
+      $('dr').innerHTML = `
+        <div style="padding:.65rem .85rem;background:var(--surface2);border-radius:6px;border:1px solid var(--border);font-size:.8rem;color:var(--text2);">
+          Dashboard: Attendance <strong>${pct(r.attendance_pct)}</strong>, CIE <strong>${pct(r.cie_pct)}</strong> &nbsp;·&nbsp; Source: <code>${esc(r.provider)}</code>
+        </div>
+        ${r.warnings?.map(w=>`<div style="padding:.5rem .75rem;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:.8rem;color:#c05621;">⚠ ${esc(w)}</div>`).join('')||''}
+        <div>
+          <label style="font-size:.78rem;font-weight:600;color:var(--text2);display:block;margin-bottom:.35rem;">Edit the draft below (AI only drafts — you decide):</label>
+          <textarea id="fm" rows="8" class="inp" style="font-size:.85rem;line-height:1.6;font-family:inherit;">${esc(r.draft)}</textarea>
+        </div>
+        <div style="padding:.65rem .85rem;background:${rTier.bg};border:1px solid ${rTier.border};border-radius:6px;font-size:.8rem;color:${rTier.color};">
+          ${rTier.label}
+        </div>
+        <button class="btn" id="ap" style="align-self:flex-start;">Approve and Save →</button>`;
+
+      $('ap').onclick = run(async () => {
+        const ab=$('ap'); ab.disabled=true; ab.textContent='Approving…';
+        try { await api(`/advisories/${r.advisory_id}/approve`,{method:'POST',json:{final_message:$('fm').value}}); toast('Advisory approved!'); closeModal(); }
+        finally { ab.disabled=false; }
+      });
+    } finally { btn.disabled=false; btn.textContent='Generate again'; }
+  });
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   REPORTS
+═══════════════════════════════════════════════════════════════════ */
+views.reports = async () => {
+  $('main').innerHTML = `
+  <div style="max-width:600px;margin:0 auto;">
+    <div class="card">
+      <div style="font-weight:600;font-size:1.05rem;margin-bottom:1.1rem;border-bottom:1px solid var(--border);padding-bottom:.8rem;">Download Academic Report</div>
+      <form id="rf" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div class="full" style="grid-column:1/-1;">
+          <label style="font-size:.78rem;font-weight:600;color:var(--text2);display:block;margin-bottom:.3rem;">Report Type</label>
+          <select name="kind" class="inp">
+            <option value="attendance">Class-wise attendance</option>
+            <option value="cie">CIE performance</option>
+            <option value="deficit">Deficit / follow-up list</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:.78rem;font-weight:600;color:var(--text2);display:block;margin-bottom:.3rem;">Format</label>
+          <select name="format" class="inp"><option value="pdf">PDF</option><option value="xlsx">Excel (.xlsx)</option></select>
+        </div>
+        <div>
+          <label style="font-size:.78rem;font-weight:600;color:var(--text2);display:block;margin-bottom:.3rem;">Status Filter</label>
+          <select name="status" class="inp"><option value="">All</option><option>Critical</option><option>Advisory</option><option>Safe</option></select>
+        </div>
+        <div>
+          <label style="font-size:.78rem;font-weight:600;color:var(--text2);display:block;margin-bottom:.3rem;">From</label>
+          <input type="date" name="date_from" class="inp">
+        </div>
+        <div>
+          <label style="font-size:.78rem;font-weight:600;color:var(--text2);display:block;margin-bottom:.3rem;">To</label>
+          <input type="date" name="date_to" class="inp">
+        </div>
+        <div style="grid-column:1/-1;padding-top:.5rem;">
+          <button id="rpbtn" class="btn" style="width:100%;padding:.7rem;font-size:.95rem;">Generate & Download</button>
+        </div>
+      </form>
+    </div>
+  </div>`;
+
+  $('rf').onsubmit = run(async e => {
+    e.preventDefault(); const btn=$('rpbtn'); btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Generating…';
+    try {
+      const f=Object.fromEntries(new FormData(e.target));
+      const q=new URLSearchParams({course_id:S.courseId,format:f.format});
+      ['date_from','date_to','status'].forEach(k=>f[k]&&q.set(k,f[k]));
+      const blob=await api(`/reports/${f.kind}?${q}`,{blob:true});
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${f.kind}_report.${f.format}`; a.click();
+      toast('Report downloaded');
+    } finally { btn.disabled=false; btn.textContent='Generate & Download'; }
+  });
+};
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   ADMIN
+═══════════════════════════════════════════════════════════════════ */
+views.admin = async () => {
+  const [users, set] = await Promise.all([api('/users'), api('/settings')]);
+  const staff = users.filter(u=>u.role!=='student');
+
+  $('main').innerHTML = `
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem;">
+    <form id="uf" class="card" style="display:flex;flex-direction:column;gap:.85rem;">
+      <div style="font-weight:600;font-size:.95rem;border-bottom:1px solid var(--border);padding-bottom:.6rem;">Add User</div>
+      ${['name:text:Full Name','email:email:Email','password:password:Password (min 6)'].map(s=>{const[n,t,p]=s.split(':');return`<div><label style="font-size:.78rem;font-weight:600;color:var(--text2);display:block;margin-bottom:.3rem;">${p}</label><input class="inp" name="${n}" type="${t}" placeholder="${p}" required></div>`;}).join('')}
+      <div><label style="font-size:.78rem;font-weight:600;color:var(--text2);display:block;margin-bottom:.3rem;">Role</label>
+        <select class="inp" name="role"><option value="faculty">Faculty</option><option value="admin">Admin (HOD)</option><option value="student">Student</option></select>
+      </div>
+      <button id="aubtn" class="btn">Create User</button>
+    </form>
+
+    <form id="cf" class="card" style="display:flex;flex-direction:column;gap:.85rem;">
+      <div style="font-weight:600;font-size:.95rem;border-bottom:1px solid var(--border);padding-bottom:.6rem;">Add Course</div>
+      <div><label style="font-size:.78rem;font-weight:600;color:var(--text2);display:block;margin-bottom:.3rem;">Course Name</label><input class="inp" name="course_name" placeholder="Data Structures" required></div>
+      <div><label style="font-size:.78rem;font-weight:600;color:var(--text2);display:block;margin-bottom:.3rem;">Course Code</label><input class="inp" name="course_code" placeholder="CS301" required></div>
+      <div><label style="font-size:.78rem;font-weight:600;color:var(--text2);display:block;margin-bottom:.3rem;">Semester</label><input class="inp" name="semester" type="number" min="1" max="12" value="3" required></div>
+      <div><label style="font-size:.78rem;font-weight:600;color:var(--text2);display:block;margin-bottom:.3rem;">Assign Faculty</label>
+        <select class="inp" name="faculty_id">${staff.map(u=>`<option value="${u.user_id}">${esc(u.name)}</option>`).join('')}</select>
+      </div>
+      <button id="acbtn" class="btn">Create Course</button>
+    </form>
+
+    <form id="tf" class="card" style="display:flex;flex-direction:column;gap:.85rem;">
+      <div style="font-weight:600;font-size:.95rem;border-bottom:1px solid var(--border);padding-bottom:.6rem;">Deficit Thresholds</div>
+      ${[
+        ['critical_below','Critical cutoff (%) — below this is red'],
+        ['advisory_upto','Advisory cap (%) — up to this is orange'],
+        ['cie_cutoff','Low CIE cutoff (%) — below this is flagged'],
+        ['drop_points','Sudden drop (points) — between assessments'],
+      ].map(([k,l])=>`<div><label style="font-size:.78rem;font-weight:600;color:var(--text2);display:block;margin-bottom:.3rem;">${l}</label><input class="inp" name="${k}" type="number" step="any" value="${set[k]}"></div>`).join('')}
+      <button id="asbtn" class="btn">Save Thresholds</button>
+    </form>
+  </div>`;
+
+  $('uf').onsubmit = run(async e => { e.preventDefault(); const btn=$('aubtn'); btn.disabled=true; btn.textContent='Creating…';
+    try { await api('/users',{method:'POST',json:Object.fromEntries(new FormData(e.target))}); toast('User created'); show(); } finally { btn.disabled=false; btn.textContent='Create User'; }});
+  $('cf').onsubmit = run(async e => { e.preventDefault(); const btn=$('acbtn'); btn.disabled=true; btn.textContent='Creating…';
+    try { const f=Object.fromEntries(new FormData(e.target)); f.semester=+f.semester; f.faculty_id=+f.faculty_id; await api('/courses',{method:'POST',json:f}); S.courses=await api('/courses'); toast('Course created'); renderShell(); } finally { btn.disabled=false; btn.textContent='Create Course'; }});
+  $('tf').onsubmit = run(async e => { e.preventDefault(); const btn=$('asbtn'); btn.disabled=true; btn.textContent='Saving…';
+    try { const f=Object.fromEntries(new FormData(e.target)); Object.keys(f).forEach(k=>f[k]=+f[k]); await api('/settings',{method:'PUT',json:f}); toast('Thresholds saved'); } finally { btn.disabled=false; btn.textContent='Save Thresholds'; }});
+};
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   STUDENT PORTAL
+═══════════════════════════════════════════════════════════════════ */
+async function renderStudent() {
+  $('app').innerHTML = `
+  <header style="background:#fff;border-bottom:1px solid var(--border);">
+    <div style="max-width:900px;margin:0 auto;padding:.85rem 1.25rem;display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-size:1.1rem;font-weight:700;color:var(--accent);">FacultyFlow</span>
+      <div style="display:flex;align-items:center;gap:.75rem;">
+        <span style="font-size:.82rem;color:var(--text2);">${esc(S.user.name)}</span>
+        <button class="btn-ghost" style="font-size:.78rem;padding:.35rem .8rem;" onclick="logout()">Log out</button>
+      </div>
+    </div>
+  </header>
+  <main style="max-width:900px;margin:0 auto;padding:1.5rem 1.25rem;" id="smain">
+    <div class="card empty-state"><div class="spinner" style="border-top-color:var(--accent);border-color:var(--border);"></div></div>
+  </main>`;
+
+  try {
+    const d = await api('/student/me');
+    $('smain').innerHTML = d.length ? d.map(c => {
+      const t = getTierInfo(c.attendance_pct);
+      const prob = calcClassesNeeded(c.attended, c.total_classes, 75);
+      let probText = '';
+      if (prob) {
+        if (prob.status === 'above') probText = `<span style="color:var(--accent);font-weight:600;">You can miss up to ${prob.canMiss} more classes and stay above 75%.</span>`;
+        else probText = `<span style="color:var(--red);font-weight:600;">You need to attend ${prob.needed} consecutive classes to reach 75%.</span>`;
+      }
+      const barPct = c.attendance_pct != null ? Math.min(100, c.attendance_pct) : 0;
+      const ciePct = c.cie_pct != null ? Math.min(100, c.cie_pct) : 0;
+      return `<div class="card fade-up" style="margin-bottom:1rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:.75rem;margin-bottom:1rem;">
+          <div>
+            <div style="font-weight:700;font-size:1rem;">${esc(c.code)} · ${esc(c.course)}</div>
+          </div>
+          ${badge(c.attendance_status)}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+          <div>
+            <div style="font-size:.75rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;">Attendance</div>
+            <div style="font-size:2rem;font-weight:700;color:${t.color};margin:.2rem 0;">${pct(c.attendance_pct)}</div>
+            <div class="prob-bar-wrap"><div class="prob-bar" style="width:${barPct}%;background:${t.border};"></div></div>
+            <div style="font-size:.78rem;color:var(--text2);margin-top:.3rem;">${c.attended}/${c.total_classes} classes attended</div>
+            <div style="font-size:.78rem;margin-top:.4rem;">${probText}</div>
+          </div>
+          <div>
+            <div style="font-size:.75rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;">CIE (Internal Marks)</div>
+            <div style="font-size:2rem;font-weight:700;color:${c.cie_pct!=null&&c.cie_pct<40?'var(--red)':'var(--accent)'};margin:.2rem 0;">${pct(c.cie_pct)}</div>
+            <div class="prob-bar-wrap"><div class="prob-bar" style="width:${ciePct}%;background:${c.cie_pct!=null&&c.cie_pct<40?'var(--red)':'var(--accent)'};"></div></div>
+            <div style="font-size:.78rem;color:var(--text2);margin-top:.3rem;">Based on scored assessments</div>
+          </div>
+        </div>
+        ${c.advisories&&c.advisories.length?`
+          <div style="border-top:1px solid var(--border);padding-top:.85rem;">
+            <div style="font-size:.75rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem;">Faculty Notes</div>
+            ${c.advisories.map(a=>`<blockquote style="border-left:3px solid ${t.border};padding:.7rem .9rem;margin:.4rem 0;background:${t.bg};border-radius:0 6px 6px 0;font-size:.875rem;white-space:pre-line;color:var(--text);">${esc(a.message)}</blockquote>`).join('')}
+          </div>`:''} 
+      </div>`;}).join('') : `<div class="card empty-state"><div style="font-size:2rem;margin-bottom:.5rem;">🎓</div><div style="font-weight:600;">No records found</div><p style="font-size:.85rem;color:var(--text2);margin-top:.3rem;">No enrolled courses for ${esc(S.user.email)}.</p></div>`;
+  } catch(e) { toast(e.message,false); }
+}
+
+start();
+</script>
+</body>
+</html>
