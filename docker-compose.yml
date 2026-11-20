@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://facultyflow:facultyflow_pass@db:5432/facultyflow_db
+      - SECRET_KEY=prod-secret-facultyflow-change-me-random-64-bytes-token
+      - AI_PROVIDER=mock
+      - PORT=8000
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=facultyflow
+      - POSTGRES_PASSWORD=facultyflow_pass
+      - POSTGRES_DB=facultyflow_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U facultyflow -d facultyflow_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  pgdata:

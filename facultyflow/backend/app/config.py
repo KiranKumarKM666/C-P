@@ -7,6 +7,13 @@ SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
 ALGORITHM = "HS256"
 TOKEN_MINUTES = int(os.getenv("TOKEN_MINUTES", "480"))
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./facultyflow.db")
+# Fix Heroku/Render/Railway postgres:// URL prefix for SQLAlchemy 2.0+
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
+PORT = int(os.getenv("PORT", "8000"))
+
 
 AI_PROVIDER = os.getenv("AI_PROVIDER", "mock").lower()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")

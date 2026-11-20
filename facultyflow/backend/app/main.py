@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
+from .config import CORS_ORIGINS
 from .database import Base, engine
 from .routers import advisories, attendance, auth_routes, courses, marks, reports
 
@@ -20,8 +21,12 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="FacultyFlow", version="1.0",
               description="AI drafts; the teacher always decides.")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"],
-                   allow_headers=["*"], expose_headers=["Content-Disposition"])
+app.add_middleware(CORSMiddleware,
+                   allow_origins=CORS_ORIGINS,
+                   allow_credentials=True if CORS_ORIGINS != ["*"] else False,
+                   allow_methods=["*"],
+                   allow_headers=["*"],
+                   expose_headers=["Content-Disposition"])
 
 # Rate limit for login (in-memory sliding window)
 login_attempts: dict[str, list[float]] = defaultdict(list)
@@ -89,5 +94,9 @@ for r in (auth_routes, courses, attendance, marks, advisories, reports):
 
 # Serve the front end from the same server (API routes above take priority)
 FRONTEND = Path(__file__).resolve().parents[2] / "frontend"
+if not FRONTEND.exists():
+    FRONTEND = Path(__file__).resolve().parents[1] / "frontend"
+if not FRONTEND.exists():
+    FRONTEND = Path("/app/frontend")
 if FRONTEND.exists():
     app.mount("/", StaticFiles(directory=FRONTEND, html=True), name="frontend")
