@@ -31,11 +31,14 @@ class Course(Base):
 class Student(Base):
     __tablename__ = "students"
     student_id = Column(Integer, primary_key=True)
-    usn = Column(String(30), unique=True, nullable=False, index=True)
+    usn = Column(String(30), nullable=False, index=True)
     name = Column(String(100), nullable=False)
     email = Column(String(120))
     course_id = Column(Integer, ForeignKey("courses.course_id"), nullable=False, index=True)
     course = relationship("Course", back_populates="students")
+    __table_args__ = (
+        UniqueConstraint("usn", "course_id", name="uq_student_usn_course"),
+    )
 
 
 class Attendance(Base):

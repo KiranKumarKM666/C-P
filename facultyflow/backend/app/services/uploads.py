@@ -41,7 +41,9 @@ def clean(v) -> str:
 
 def import_students(db: Session, course: Course, df: pd.DataFrame):
     require_columns(df, ["usn", "name"])
-    existing = {u.upper() for (u,) in db.query(Student.usn).all()}
+    existing = {u.upper() for (u,) in db.query(Student.usn).filter(
+        Student.course_id == course.course_id
+    ).all()}
     seen, errors, created = set(), [], 0
     for idx, row in df.iterrows():
         n = idx + 2  # spreadsheet row number (header is row 1)
@@ -72,6 +74,7 @@ def import_attendance(db: Session, course: Course, df: pd.DataFrame):
         n = idx + 2
         usn = clean(row.get("usn")).upper()
         status = STATUS_MAP.get(clean(row.get("status")).lower())
+        reason = clean(row.get("reason")) or None
         d = pd.to_datetime(clean(row.get("date")), dayfirst=True, errors="coerce")
         if usn not in by_usn:
             errors.append({"row": n, "error": f"USN '{usn}' is not in this course"})
@@ -89,10 +92,12 @@ def import_attendance(db: Session, course: Course, df: pd.DataFrame):
             rec = existing.get((sid, d.date()))
             if rec:
                 rec.status = status
+                rec.reason = reason if status == "Absent" else None
                 updated += 1
             else:
                 db.add(Attendance(student_id=sid, course_id=course.course_id,
-                                  date=d.date(), status=status))
+                                  date=d.date(), status=status,
+                                  reason=reason if status == "Absent" else None))
                 inserted += 1
     db.commit()
     return {"imported": inserted, "updated": updated, "errors": errors}

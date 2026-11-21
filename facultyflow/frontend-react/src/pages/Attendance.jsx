@@ -304,7 +304,7 @@ export default function Attendance() {
             </div>
 
             <p className="text-xs text-text-2 leading-relaxed">
-              Upload class sheets with columns: <code className="bg-surface-2 px-1 py-0.5 rounded text-[0.7rem]">usn, date, status</code> (Present / Absent).
+              Upload class sheets with columns: <code className="bg-surface-2 px-1 py-0.5 rounded text-[0.7rem]">usn, date, status, reason</code> (reason is optional and only used for absent students).
             </p>
 
             <label className="border-2 border-dashed border-border-2 rounded-lg p-4 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-accent hover:bg-surface-2 transition-all text-center">

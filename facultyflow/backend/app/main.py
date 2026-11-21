@@ -25,8 +25,45 @@ try:
         cols = conn.execute(text("PRAGMA table_info(attendance)")).fetchall()
         if cols and not any(row[1] == "reason" for row in cols):
             conn.execute(text("ALTER TABLE attendance ADD COLUMN reason VARCHAR(240)"))
+
+        # Students are course-specific. Rebuild the SQLite students table once if
+        # an older global USN uniqueness constraint is still present.
+        student_cols = conn.execute(text("PRAGMA table_info(students)")).fetchall()
+        if student_cols:
+            global_usn_unique = False
+            for index in conn.execute(text("PRAGMA index_list(students)")).fetchall():
+                if index[2]:
+                    index_name = str(index[1]).replace('"', '""')
+                    index_columns = conn.execute(
+                        text(f'PRAGMA index_info("{index_name}")')
+                    ).fetchall()
+                    if [row[2] for row in index_columns] == ["usn"]:
+                        global_usn_unique = True
+                        break
+
+            if global_usn_unique:
+                conn.execute(text("""
+                    CREATE TABLE students_course_specific (
+                        student_id INTEGER PRIMARY KEY,
+                        usn VARCHAR(30) NOT NULL,
+                        name VARCHAR(100) NOT NULL,
+                        email VARCHAR(120),
+                        course_id INTEGER NOT NULL,
+                        CONSTRAINT uq_student_usn_course UNIQUE (usn, course_id),
+                        FOREIGN KEY(course_id) REFERENCES courses(course_id)
+                    )
+                """))
+                conn.execute(text("""
+                    INSERT INTO students_course_specific
+                        (student_id, usn, name, email, course_id)
+                    SELECT student_id, usn, name, email, course_id FROM students
+                """))
+                conn.execute(text("DROP TABLE students"))
+                conn.execute(text("ALTER TABLE students_course_specific RENAME TO students"))
+                conn.execute(text("CREATE INDEX ix_students_usn ON students(usn)"))
+                conn.execute(text("CREATE INDEX ix_students_course_id ON students(course_id)"))
 except Exception:
-    logger.exception("Failed to apply attendance reason schema upgrade")
+    logger.exception("Failed to apply SQLite schema upgrades")
 
 app = FastAPI(title="FacultyFlow", version="1.0",
               description="AI drafts; the teacher always decides.")

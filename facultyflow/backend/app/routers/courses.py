@@ -56,7 +56,7 @@ def add_student(course_id: int, body: StudentCreate, db: Session = Depends(get_d
                 user: User = Depends(require_role(*STAFF))):
     get_course_for_user(db, user, course_id)
     usn = body.usn.strip().upper()
-    if db.query(Student).filter(Student.usn == usn).first():
+    if db.query(Student).filter(Student.usn == usn, Student.course_id == course_id).first():
         raise HTTPException(409, f"USN {usn} already exists")
     s = Student(usn=usn, name=body.name.strip(), email=(body.email or None), course_id=course_id)
     db.add(s)
@@ -87,7 +87,11 @@ def update_student(course_id: int, student_id: int, body: StudentCreate,
     if not s or s.course_id != course_id:
         raise HTTPException(404, "Student not found in this course")
     usn = body.usn.strip().upper()
-    existing = db.query(Student).filter(Student.usn == usn, Student.student_id != student_id).first()
+    existing = db.query(Student).filter(
+        Student.usn == usn,
+        Student.course_id == course_id,
+        Student.student_id != student_id,
+    ).first()
     if existing:
         raise HTTPException(409, f"USN {usn} already exists")
     s.usn = usn
@@ -151,7 +155,7 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(require_role(*
 
 TEMPLATES = {
     "students": "usn,name,email\n1XX23CS001,Asha Rao,asha@example.com\n",
-    "attendance": "usn,date,status\n1XX23CS001,2026-11-10,Present\n1XX23CS002,2026-11-10,Absent\n",
+    "attendance": "usn,date,status,reason\n1XX23CS001,2026-11-10,Present,\n1XX23CS002,2026-11-10,Absent,Medical leave\n",
     "marks": "usn,assessment,max_marks,marks\n1XX23CS001,Test 1,25,22.5\n1XX23CS002,Test 1,25,AB\n",
 }
 

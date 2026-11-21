@@ -70,6 +70,28 @@ def test_attendance_validation_and_future_date():
     assert r.status_code == 422
 
 
+def test_same_usn_can_be_enrolled_in_different_courses():
+    hod = login("hod@college.edu", "admin123")
+    users = client.get("/users", headers=hod).json()
+    ravi = next(u for u in users if u["email"] == "ravi@college.edu")
+    course = client.post("/courses", headers=hod, json={
+        "course_name": "Cross Course Test",
+        "course_code": "CCT999",
+        "semester": 2,
+        "faculty_id": ravi["user_id"],
+    })
+    assert course.status_code == 201
+    cid = course.json()["course_id"]
+
+    # The seed roster already contains this USN in its original course.
+    r = client.post(f"/courses/{cid}/students", headers=hod, json={
+        "usn": "1XX23CS001",
+        "name": "Asha Rao",
+        "email": "asha@college.edu",
+    })
+    assert r.status_code == 201
+
+
 def test_deficits_upload_ai_reports():
     h = login("meera@college.edu", "faculty123")
     cid = client.get("/courses", headers=h).json()[0]["course_id"]
