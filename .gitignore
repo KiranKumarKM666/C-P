@@ -13,3 +13,7 @@ env/
 htmlcov/
 node_modules/
 .DS_Store
+*.pdf
+frontend-react/node_modules/
+frontend-react/dist/
+

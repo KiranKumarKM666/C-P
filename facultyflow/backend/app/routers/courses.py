@@ -108,13 +108,24 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(require_role(*
     out = []
     for c in q.order_by(Course.course_code):
         rows = course_summary(db, c.course_id)
-        out.append({**course_dict(c, db),
-                    "critical": sum(r["attendance_status"] == "Critical" for r in rows),
-                    "advisory": sum(r["attendance_status"] == "Advisory" for r in rows),
-                    "safe": sum(r["attendance_status"] == "Safe" for r in rows),
-                    "low_cie": sum(any("CIE" in x and "cutoff" in x for x in r["reasons"])
-                                   for r in rows),
-                    "flagged": sum(bool(r["reasons"]) for r in rows)})
+        critical_count = sum(r["attendance_status"] == "Critical" for r in rows)
+        advisory_count = sum(r["attendance_status"] == "Advisory" for r in rows)
+        safe_count     = sum(r["attendance_status"] == "Safe"     for r in rows)
+        low_cie_count  = sum(any("CIE" in x and "cutoff" in x for x in r["reasons"]) for r in rows)
+        out.append({
+            **course_dict(c, db),
+            # Legacy names
+            "critical": critical_count,
+            "advisory": advisory_count,
+            "safe": safe_count,
+            "low_cie": low_cie_count,
+            "flagged": sum(bool(r["reasons"]) for r in rows),
+            "total_students": len(rows),
+            # React-expected names
+            "critical_count": critical_count,
+            "advisory_count": advisory_count,
+            "low_cie_count":  low_cie_count,
+        })
     return out
 
 

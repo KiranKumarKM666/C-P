@@ -18,25 +18,36 @@ def save_marks(body: MarksIn, db: Session = Depends(get_db),
     get_course_for_user(db, user, body.course_id)
     valid = {s for (s,) in db.query(Student.student_id).filter(Student.course_id == body.course_id)}
     ids = [r.student_id for r in body.records]
-    if len(set(ids)) != len(ids):
-        raise HTTPException(400, "A student appears more than once")
     bad = [i for i in ids if i not in valid]
     if bad:
         raise HTTPException(400, f"Student(s) {bad} are not in this course")
-    name = body.assessment_name.strip()
-    existing = {m.student_id: m for m in db.query(Mark).filter(
-        Mark.course_id == body.course_id, Mark.assessment_name == name)}
+    top_name = (body.assessment_name or "").strip()
+    saved = 0
     for r in body.records:
-        obtained = None if r.absent else r.marks_obtained
-        m = existing.get(r.student_id)
-        if m:  # one entry per student per assessment: update, never duplicate
-            m.max_marks, m.marks_obtained, m.is_absent = body.max_marks, obtained, r.absent
+        name = (r.assessment_name or top_name or "").strip()
+        if not name:
+            raise HTTPException(400, "assessment_name is required")
+        eff_max = r.max_marks or body.max_marks
+        if not eff_max or eff_max <= 0:
+            raise HTTPException(400, "max_marks must be > 0")
+        is_absent = r.eff_absent
+        obtained = None if is_absent else r.marks_obtained
+        existing = db.query(Mark).filter(
+            Mark.course_id == body.course_id,
+            Mark.student_id == r.student_id,
+            Mark.assessment_name == name,
+        ).first()
+        if existing:
+            existing.max_marks = eff_max
+            existing.marks_obtained = obtained
+            existing.is_absent = is_absent
         else:
             db.add(Mark(student_id=r.student_id, course_id=body.course_id,
-                        assessment_name=name, max_marks=body.max_marks,
-                        marks_obtained=obtained, is_absent=r.absent))
+                        assessment_name=name, max_marks=eff_max,
+                        marks_obtained=obtained, is_absent=is_absent))
+        saved += 1
     db.commit()
-    return {"saved": len(body.records), "assessment": name}
+    return {"saved": saved, "assessment": top_name or "mixed"}
 
 
 @router.get("/courses/{course_id}/marks")

@@ -29,7 +29,8 @@ def draft(body: DraftIn, db: Session = Depends(get_db),
                    issue_type=body.issue_type, ai_draft=result["draft"])
     db.add(adv)
     db.commit()
-    return {"advisory_id": adv.advisory_id, "draft": result["draft"],
+    return {"advisory_id": adv.advisory_id, "ai_draft": result["draft"],
+            "draft": result["draft"],
             "provider": result["provider"], "warnings": result["warnings"],
             "attendance_pct": row["attendance_pct"], "cie_pct": row["cie_pct"]}
 
@@ -68,17 +69,47 @@ def my_records(db: Session = Depends(get_db), user: User = Depends(require_role(
     """Students see only their own record and only approved advisories."""
     out = []
     for s in db.query(Student).filter(Student.email == user.email).all():
-        row = next(r for r in strip_internal(course_summary(db, s.course_id))
-                   if r["student_id"] == s.student_id)
+        summary_rows = strip_internal(course_summary(db, s.course_id))
+        row = next((r for r in summary_rows if r["student_id"] == s.student_id), None)
+        if not row:
+            continue
         course = db.get(Course, s.course_id)
         advs = (db.query(Advisory).filter(Advisory.student_id == s.student_id,
                                           Advisory.faculty_approved.is_(True)).all())
-        out.append({"course": course.course_name, "code": course.course_code,
-                    "attendance_pct": row["attendance_pct"],
-                    "attendance_status": row["attendance_status"],
-                    "attended": row["attended"], "total_classes": row["total_classes"],
-                    "cie_pct": row["cie_pct"],
-                    "advisories": [{"message": a.final_message,
-                                    "date": a.approved_at.isoformat() if a.approved_at else None}
-                                   for a in advs]})
-    return out
+        # Build CIE score details for the bar chart
+        from ..models import Mark
+        marks = db.query(Mark).filter(
+            Mark.student_id == s.student_id,
+            Mark.is_absent.is_(False),
+        ).order_by(Mark.mark_id).all()
+        cie_scores = []
+        for m in marks:
+            if m.marks_obtained is not None and m.max_marks:
+                cie_scores.append({
+                    "assessment_name": m.assessment_name,
+                    "marks_obtained": m.marks_obtained,
+                    "max_marks": m.max_marks,
+                    "pct": round(m.marks_obtained / m.max_marks * 100, 1),
+                })
+        out.append({
+            "course_id": course.course_id,
+            "course_name": course.course_name,
+            "course_code": course.course_code,
+            "semester": course.semester,
+            "attendance_pct": row["attendance_pct"],
+            "attendance_status": row["attendance_status"],
+            "attended": row["attended"],
+            "total_classes": row["total_classes"],
+            "cie_pct": row["cie_pct"],
+            "cie_scores": cie_scores,
+            "advisories": [
+                {
+                    "advisory_id": a.advisory_id,
+                    "final_message": a.final_message,
+                    "approved_at": a.approved_at.isoformat() if a.approved_at else None,
+                }
+                for a in advs
+            ],
+        })
+    # Return in a wrapper the React StudentPortal expects: { courses: [...] }
+    return {"courses": out}

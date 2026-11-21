@@ -28,8 +28,11 @@ facultyflow/
 │   ├── tests/test_app.py
 │   ├── requirements.txt
 │   └── .env.example
-└── frontend/index.html        # no-build UI: Tailwind CDN + Chart.js + vanilla JS
+└── frontend/index.html        # React SPA build output (source in frontend-react/)
 ```
+
+> **Frontend source:** `facultyflow/frontend-react/` — Vite + React 18 + Tailwind 3 + Three.js r161 + Chart.js 4.  
+> Build: `cd facultyflow/frontend-react && npm run build` → output goes to `facultyflow/frontend/`
 
 First task: install dependencies, run `python -m app.seed`, run `pytest`, start `uvicorn app.main:app --reload`, and confirm http://localhost:8000 loads and the demo logins work.
 
@@ -37,7 +40,7 @@ First task: install dependencies, run `python -m app.seed`, run `pytest`, start 
 
 | Layer | Tools |
 |---|---|
-| Front end | HTML, CSS, JavaScript, Tailwind CSS, Chart.js (optional upgrade to React, see Phase 6) |
+| Front end | **React 18, Vite 5, Tailwind CSS 3, Chart.js 4 + react-chartjs-2, Three.js r161** |
 | Back end | Python, FastAPI, Uvicorn, SQLAlchemy |
 | Auth | JWT (PyJWT), bcrypt password hashes |
 | Files | Pandas, openpyxl |
@@ -45,6 +48,33 @@ First task: install dependencies, run `python -m app.seed`, run `pytest`, start 
 | AI | Gemini, OpenAI or Ollama (local), behind one `generate_draft()` function |
 | Reports | ReportLab (PDF), openpyxl (Excel) |
 | Tests | pytest, FastAPI TestClient |
+
+### Frontend structure (React SPA)
+```
+facultyflow/frontend-react/   ← Vite source (npm run build → ../frontend/)
+  src/
+    api.js                    ← single fetch wrapper; all endpoints here
+    main.jsx                  ← ReactDOM.createRoot + BrowserRouter
+    App.jsx                   ← Routes + PrivateRoute + AppShell
+    pages/
+      Login.jsx               ← Three.js glass card landing page
+      Dashboard.jsx           ← Stat cards + course table + Doughnut chart
+      Students.jsx            ← Roster CRUD + CSV upload
+      Attendance.jsx          ← Date picker + radio grid + bulk upload
+      Marks.jsx               ← Assessment selector + marks grid + bulk upload
+      Deficits.jsx            ← Risk table + progress bars + TrendChart + AdvisoryModal
+      Reports.jsx             ← PDF/Excel downloads per report type
+      Admin.jsx               ← Thresholds + user/course creation
+      StudentPortal.jsx       ← Three.js background + glass cards + CIE bar chart
+    components/
+      Navbar.jsx              ← Top nav + role pill + sign-out
+      Chatbot.jsx             ← Floating keyword-based assistant
+```
+
+**Build**: `cd facultyflow/frontend-react && npm run build` → outputs to `facultyflow/frontend/`  
+FastAPI mounts `facultyflow/frontend/` at `/` (static), so API and UI share one origin.
+
+**Dev proxy** (`vite.config.js`): all API paths proxied to `http://localhost:8000`.
 
 ## 4. Users and roles
 
@@ -167,7 +197,7 @@ Complete and verify one phase before starting the next.
 3. **Polish the front end.** Add loading states, empty states, inline validation messages, a confirm dialog on destructive actions, keyboard-accessible controls, and a layout that works on a phone. Add a trend chart (attendance over time) on the deficits screen.
 4. **Marks upload.** Add `POST /marks/upload` (columns: usn, assessment, max_marks, marks, with AB for absent), using the same row-by-row validation pattern as attendance.
 5. **AI providers.** Test each of `gemini`, `openai` and `ollama` against the same interface. Add a test that mocks the HTTP call and checks the fallback path.
-6. **Optional: React front end.** Rebuild `frontend/` as a Vite + React + Tailwind app that talks to the **same API contract**. One component per screen: Login, Dashboard, Students, Attendance, Marks, Deficits (with the advisory review modal), Reports, Admin, StudentPortal. Keep one `api.js` module. Do not change any endpoint.
+6. **React front end (DONE).** Rebuilt `frontend/` as a Vite + React + Tailwind app. Source in `facultyflow/frontend-react/`. Built output in `facultyflow/frontend/`. Same API contracts, no endpoints changed. Three.js 3D backgrounds on Login and StudentPortal.
 7. **Deploy.** Switch `DATABASE_URL` to PostgreSQL, add a `Dockerfile`, serve over HTTPS, set a long random `SECRET_KEY`, restrict CORS to the real front-end origin, and deploy to Render or Railway.
 
 ## 10. Security and privacy checklist

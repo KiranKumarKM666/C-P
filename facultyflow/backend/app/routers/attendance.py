@@ -56,9 +56,15 @@ def attendance_trend(course_id: int, db: Session = Depends(get_db),
                .filter(Attendance.course_id == course_id)
                .group_by(Attendance.date)
                .order_by(Attendance.date.asc()).all())
-    return [{"date": str(d), "total": int(tot), "present": int(att or 0),
+    rows = [{"date": str(d), "total": int(tot), "present": int(att or 0),
              "percentage": round((att or 0) / tot * 100, 1) if tot else 0.0}
             for d, tot, att in records]
+    # Also return chart-friendly format for React
+    return {
+        "rows": rows,
+        "labels": [r["date"] for r in rows],
+        "values": [r["percentage"] for r in rows],
+    }
 
 
 

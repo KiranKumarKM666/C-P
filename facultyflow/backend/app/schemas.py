@@ -58,33 +58,56 @@ class AttendanceIn(BaseModel):
 class MarkRecord(BaseModel):
     student_id: int
     marks_obtained: Optional[float] = None
-    absent: bool = False
+    is_absent: bool = False
+    # Legacy field alias
+    absent: Optional[bool] = None
+    # Per-record assessment (React frontend sends these per-row)
+    assessment_name: Optional[str] = None
+    max_marks: Optional[float] = None
+
+    @property
+    def eff_absent(self) -> bool:
+        return self.is_absent or bool(self.absent)
 
 
 class MarksIn(BaseModel):
     course_id: int
-    assessment_name: str = Field(min_length=1)
-    max_marks: float = Field(gt=0)
+    assessment_name: Optional[str] = None  # top-level (old format)
+    max_marks: Optional[float] = None      # top-level (old format)
     records: List[MarkRecord] = Field(min_length=1)
 
     @model_validator(mode="after")
     def check_marks(self):
         for r in self.records:
-            if r.absent:
+            eff_max = r.max_marks or self.max_marks or 0
+            if eff_max <= 0:
+                raise ValueError("max_marks must be > 0")
+            if r.eff_absent:
                 continue
             if r.marks_obtained is None:
                 raise ValueError("Enter marks or tick AB for every student")
             if r.marks_obtained < 0:
                 raise ValueError("Marks cannot be negative")
-            if r.marks_obtained > self.max_marks:
-                raise ValueError(f"Marks cannot exceed {self.max_marks:g}")
+            if r.marks_obtained > eff_max:
+                raise ValueError(f"Marks cannot exceed {eff_max:g}")
         return self
 
 
 class DraftIn(BaseModel):
     student_id: int
     course_id: int
-    issue_type: Literal["attendance", "marks"]
+    # Accept both short codes and free-form strings from the React frontend
+    issue_type: str = Field(min_length=1)
+
+    @field_validator("issue_type")
+    @classmethod
+    def normalise_issue(cls, v: str) -> str:
+        v = v.strip().lower()
+        if "attendance" in v:
+            return "attendance"
+        if "mark" in v or "cie" in v or "low" in v:
+            return "marks"
+        return v  # pass through; AI handles it
 
 
 class ApproveIn(BaseModel):
