@@ -154,7 +154,6 @@ def health():
 
 
 for r in (auth_routes, courses, attendance, marks, advisories, reports):
-    app.include_router(r.router)
     app.include_router(r.router, prefix="/api")
 
 
