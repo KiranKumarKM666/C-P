@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from ..auth import get_course_for_user, require_role
@@ -125,12 +125,15 @@ def deficits(course_id: int, db: Session = Depends(get_db),
 
 
 @router.get("/api/dashboard")
-def dashboard(db: Session = Depends(get_db), user: User = Depends(require_role(*STAFF))):
+def dashboard(limit: int = Query(default=200, ge=1, le=200),
+              offset: int = Query(default=0, ge=0),
+              db: Session = Depends(get_db),
+              user: User = Depends(require_role(*STAFF))):
     q = db.query(Course)
     if user.role == "faculty":
         q = q.filter(Course.faculty_id == user.user_id)
     out = []
-    for c in q.order_by(Course.course_code):
+    for c in q.order_by(Course.course_code).offset(offset).limit(limit):
         rows = course_summary(db, c.course_id)
         critical_count = sum(r["attendance_status"] == "Critical" for r in rows)
         advisory_count = sum(r["attendance_status"] == "Advisory" for r in rows)
