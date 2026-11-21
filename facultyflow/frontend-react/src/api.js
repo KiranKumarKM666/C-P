@@ -1,5 +1,5 @@
 // ─── Single API module ───────────────────────────────────────────────────────
-const BASE = import.meta.env.VITE_API_BASE || ''
+const BASE = import.meta.env.VITE_API_BASE || '/api'
 
 function getToken() { return sessionStorage.getItem('ff_token') }
 function setToken(t) { sessionStorage.setItem('ff_token', t) }
@@ -16,6 +16,8 @@ function authHeader() {
 
 async function request(method, path, body, isFile = false) {
   const headers = { ...authHeader() }
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(() => controller.abort(), 15000)
   let fetchBody
   if (isFile) {
     fetchBody = body // FormData — do NOT set Content-Type
@@ -24,11 +26,26 @@ async function request(method, path, body, isFile = false) {
     fetchBody = JSON.stringify(body)
   }
 
-  const res = await fetch(BASE + path, { method, headers, body: fetchBody })
+  let res
+  try {
+    res = await fetch(BASE + path, {
+      method,
+      headers,
+      body: fetchBody,
+      signal: controller.signal,
+    })
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error('The request timed out. Please try again.')
+    }
+    throw new Error('Unable to reach the server. Check your connection and try again.')
+  } finally {
+    window.clearTimeout(timeoutId)
+  }
 
   if (res.status === 401) {
     clearToken()
-    window.location.href = '/'
+    window.location.href = '/login'
     throw new Error('Session expired')
   }
 
@@ -64,7 +81,8 @@ export async function login(email, password) {
   setUser(data.user)
   return data.user
 }
-export { getToken, clearToken, getUser }
+export { getToken, clearToken, getUser, setUser }
+export const getCurrentUser = () => request('GET', '/auth/me')
 
 export const updateProfile = (body) => request('PUT', '/auth/me', body)
 export const forgotPassword = (body) => request('POST', '/auth/forgot-password', body)

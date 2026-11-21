@@ -3,7 +3,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development").strip().lower()
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    if ENVIRONMENT in ("production", "staging", "railway"):
+        raise RuntimeError("SECRET_KEY is required in production")
+    SECRET_KEY = "development-only-secret-change-before-deployment"
 ALGORITHM = "HS256"
 TOKEN_MINUTES = int(os.getenv("TOKEN_MINUTES", "480"))
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./facultyflow.db")

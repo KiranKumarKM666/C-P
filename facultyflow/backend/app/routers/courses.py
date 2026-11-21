@@ -124,7 +124,7 @@ def deficits(course_id: int, db: Session = Depends(get_db),
     return detect_deficits(db, course_id)
 
 
-@router.get("/dashboard")
+@router.get("/api/dashboard")
 def dashboard(db: Session = Depends(get_db), user: User = Depends(require_role(*STAFF))):
     q = db.query(Course)
     if user.role == "faculty":

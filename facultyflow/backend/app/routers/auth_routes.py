@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..auth import (create_token, get_current_user, hash_password, require_role,
@@ -30,12 +30,15 @@ def me(user: User = Depends(get_current_user)):
 
 
 @router.get("/users")
-def list_users(role: str | None = None, db: Session = Depends(get_db),
+def list_users(role: str | None = None,
+               limit: int = Query(default=500, ge=1, le=500),
+               offset: int = Query(default=0, ge=0),
+               db: Session = Depends(get_db),
                _: User = Depends(require_role("admin"))):
     q = db.query(User)
     if role:
         q = q.filter(User.role == role)
-    return [user_dict(u) for u in q.order_by(User.name)]
+    return [user_dict(u) for u in q.order_by(User.name).offset(offset).limit(limit)]
 
 
 @router.post("/users", status_code=201)

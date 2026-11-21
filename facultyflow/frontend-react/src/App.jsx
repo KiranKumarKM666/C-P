@@ -1,5 +1,6 @@
+import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { getToken, getUser } from './api.js'
+import { getToken, getUser, getCurrentUser, setUser } from './api.js'
 import { CourseProvider } from './context/CourseContext.jsx'
 import ThreeBackground from './components/ThreeBackground.jsx'
 import Login from './pages/Login.jsx'
@@ -16,8 +17,38 @@ import Chatbot from './components/Chatbot.jsx'
 
 function PrivateRoute({ children, role }) {
   const token = getToken()
-  const user = getUser()
-  if (!token || !user) return <Navigate to="/" replace />
+  const [checking, setChecking] = useState(Boolean(token))
+  const [user, setVerifiedUser] = useState(getUser())
+
+  useEffect(() => {
+    if (!token) {
+      setChecking(false)
+      return
+    }
+    let active = true
+    getCurrentUser()
+      .then(current => {
+        if (!active) return
+        setVerifiedUser(current)
+        setUser(current)
+        setChecking(false)
+      })
+      .catch(() => {
+        if (!active) return
+        setVerifiedUser(null)
+        setChecking(false)
+      })
+    return () => { active = false }
+  }, [token])
+
+  if (!token || (!checking && !user)) return <Navigate to="/login" replace />
+  if (checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}>
+        <div className="spinner w-8 h-8" />
+      </div>
+    )
+  }
   if (role && user.role !== role && !(role === 'faculty' && user.role === 'admin')) {
     return <Navigate to="/dashboard" replace />
   }
@@ -50,8 +81,10 @@ export default function App() {
         <Route path="/" element={
           getToken()
             ? <Navigate to={getUser()?.role === 'student' ? '/student' : '/dashboard'} replace />
-            : <Login />
+            : <Navigate to="/login" replace />
         } />
+
+        <Route path="/login" element={<Login />} />
 
         <Route path="/dashboard" element={
           <PrivateRoute>
@@ -126,7 +159,7 @@ export default function App() {
           </PrivateRoute>
         } />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </CourseProvider>
   )

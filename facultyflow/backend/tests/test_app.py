@@ -32,6 +32,17 @@ def test_bad_login():
     assert client.post("/auth/login", json={"email": "x@y.z", "password": "no"}).status_code == 401
 
 
+def test_spa_dashboard_refresh_and_api_separation():
+    dashboard_page = client.get("/dashboard", headers={"Accept": "text/html"})
+    assert dashboard_page.status_code == 200
+    assert "text/html" in dashboard_page.headers["content-type"]
+    assert b"FacultyFlow" in dashboard_page.content
+
+    unauthenticated_api = client.get("/api/dashboard")
+    assert unauthenticated_api.status_code == 401
+    assert unauthenticated_api.json() == {"detail": "Not logged in"}
+
+
 def test_access_control():
     meera, ravi = login("meera@college.edu", "faculty123"), login("ravi@college.edu", "faculty123")
     courses = client.get("/courses", headers=meera).json()

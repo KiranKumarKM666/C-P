@@ -9,9 +9,13 @@ from sqlalchemy.orm import Session
 from ..models import Attendance, Course, Mark, Student
 
 STATUS_MAP = {"present": "Present", "p": "Present", "absent": "Absent", "a": "Absent"}
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+MAX_UPLOAD_ROWS = 5000
 
 
 def read_table(raw: bytes, filename: str) -> pd.DataFrame:
+    if len(raw) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "File exceeds the 10 MB upload limit")
     name = (filename or "").lower()
     try:
         if name.endswith(".csv"):
@@ -25,7 +29,10 @@ def read_table(raw: bytes, filename: str) -> pd.DataFrame:
     except Exception:
         raise HTTPException(400, "Could not read the file. Check that it is a valid CSV or Excel file.")
     df.columns = [str(c).strip().lower() for c in df.columns]
-    return df.dropna(how="all")
+    df = df.dropna(how="all")
+    if len(df) > MAX_UPLOAD_ROWS:
+        raise HTTPException(413, f"File exceeds the {MAX_UPLOAD_ROWS}-row upload limit")
+    return df
 
 
 def require_columns(df: pd.DataFrame, needed):

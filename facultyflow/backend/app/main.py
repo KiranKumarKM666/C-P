@@ -5,7 +5,7 @@ import time
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
@@ -74,6 +74,23 @@ app.add_middleware(CORSMiddleware,
                    allow_headers=["*"],
                    expose_headers=["Content-Disposition"])
 
+MAX_REQUEST_BYTES = 10 * 1024 * 1024
+
+
+@app.middleware("http")
+async def limit_request_size(request: Request, call_next):
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > MAX_REQUEST_BYTES:
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": "Request payload exceeds the 10 MB limit"},
+                )
+        except ValueError:
+            pass
+    return await call_next(request)
+
 # Rate limit for login (in-memory sliding window)
 login_attempts: dict[str, list[float]] = defaultdict(list)
 LOGIN_LIMIT = 10          # max attempts per window
@@ -82,7 +99,7 @@ LOGIN_WINDOW_SEC = 60.0   # 1 minute window
 
 @app.middleware("http")
 async def rate_limit_login(request: Request, call_next):
-    if request.url.path == "/auth/login" and request.method == "POST":
+    if request.url.path in ("/auth/login", "/api/auth/login") and request.method == "POST":
         client_ip = request.client.host if request.client else "unknown"
         now = time.time()
         # Filter attempts within window
@@ -126,8 +143,9 @@ def health():
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         db_status = "connected"
-    except Exception as exc:
-        db_status = f"unhealthy: {exc}"
+    except Exception:
+        logger.exception("Database health check failed")
+        db_status = "unhealthy"
     is_ok = db_status == "connected"
     return JSONResponse(
         status_code=200 if is_ok else 503,
@@ -137,6 +155,35 @@ def health():
 
 for r in (auth_routes, courses, attendance, marks, advisories, reports):
     app.include_router(r.router)
+    app.include_router(r.router, prefix="/api")
+
+
+# Serve client-side routes as HTML instead of routing them through API handlers.
+# This keeps refreshes such as /dashboard and /attendance on the React SPA.
+@app.middleware("http")
+async def spa_fallback(request: Request, call_next):
+    response = await call_next(request)
+    if response.status_code != 404 or request.method != "GET":
+        return response
+
+    path = request.url.path
+    if path.startswith("/api/") or path == "/api":
+        return JSONResponse(status_code=404, content={"detail": "API endpoint not found"})
+
+    accept = request.headers.get("accept", "")
+    if "text/html" not in accept:
+        return response
+
+    # FRONTEND is resolved below; resolve it here for the fallback too.
+    frontend = Path(__file__).resolve().parents[2] / "frontend"
+    if not frontend.exists():
+        frontend = Path(__file__).resolve().parents[1] / "frontend"
+    if not frontend.exists():
+        frontend = Path("/app/frontend")
+    index = frontend / "index.html"
+    if index.exists():
+        return FileResponse(index)
+    return response
 
 # Serve the front end from the same server (API routes above take priority)
 FRONTEND = Path(__file__).resolve().parents[2] / "frontend"

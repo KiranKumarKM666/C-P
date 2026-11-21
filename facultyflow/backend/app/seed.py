@@ -1,5 +1,6 @@
 """Fill the database with DUMMY data for development. Run: python -m app.seed"""
 import datetime as dt
+import os
 import random
 
 from .auth import hash_password
@@ -12,7 +13,8 @@ NAMES = ["Asha Rao", "Bharat Kumar", "Chitra Nair", "Deepak Shetty", "Esha Patil
 
 
 def main():
-    Base.metadata.drop_all(bind=engine)
+    if os.getenv("SEED_DEMO_DATA", "").strip().lower() not in ("1", "true", "yes"):
+        raise RuntimeError("Demo seeding is disabled. Set SEED_DEMO_DATA=true only in an isolated development database.")
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     random.seed(7)

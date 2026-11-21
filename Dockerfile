@@ -1,5 +1,13 @@
-# Multi-stage lightweight production Dockerfile for FacultyFlow
-FROM python:3.11-slim as base
+# Build the React frontend
+FROM node:20-alpine AS frontend-build
+WORKDIR /build
+COPY facultyflow/frontend-react/package*.json ./
+RUN npm ci
+COPY facultyflow/frontend-react/ ./
+RUN npm run build
+
+# Lightweight production runtime
+FROM python:3.11-slim AS base
 
 WORKDIR /app
 
@@ -19,9 +27,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY facultyflow/backend/requirements.txt /app/backend/requirements.txt
 RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 
-# Copy backend and frontend code
+# Copy backend and freshly built frontend
 COPY facultyflow/backend /app/backend
-COPY facultyflow/frontend /app/frontend
+COPY --from=frontend-build /build/../frontend /app/frontend
 
 WORKDIR /app/backend
 
