@@ -15,8 +15,8 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./facultyflow.db")
 # Fix Heroku/Render/Railway postgres:// URL prefix for SQLAlchemy 2.0+
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-if DATABASE_URL.startswith("postgresql+psycopg://"):
-    DATABASE_URL = DATABASE_URL.replace("postgresql+psycopg://", "postgresql+psycopg2://", 1)
+if "+psycopg://" in DATABASE_URL:
+    DATABASE_URL = DATABASE_URL.replace("+psycopg://", "+psycopg2://", 1)
 
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
 PORT = int(os.getenv("PORT", "8000"))
