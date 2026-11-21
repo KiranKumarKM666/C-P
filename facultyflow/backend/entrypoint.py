@@ -24,6 +24,22 @@ def init_db():
         try:
             from app.models import User
             user_count = db.query(User).count()
+
+            if os.getenv("RESET_DEMO_PASSWORDS", "").strip().lower() in ("1", "true", "yes"):
+                from app.auth import hash_password
+                password_by_role = {
+                    "hod@college.edu": ("admin123", "admin"),
+                    "meera@college.edu": ("faculty123", "faculty"),
+                    "ravi@college.edu": ("faculty123", "faculty"),
+                    "asha@college.edu": ("student123", "student"),
+                }
+                for email, (password, role) in password_by_role.items():
+                    user = db.query(User).filter(User.email == email).first()
+                    if user:
+                        user.password_hash = hash_password(password)
+                        user.role = role
+                db.commit()
+                print("[DEPLOY] Demo account passwords synchronized explicitly.")
         finally:
             db.close()
         print(f"[DEPLOY] Database initialized ({user_count} users present).")
