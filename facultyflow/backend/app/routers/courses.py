@@ -124,7 +124,7 @@ def deficits(course_id: int, db: Session = Depends(get_db),
     return detect_deficits(db, course_id)
 
 
-@router.get("/api/dashboard")
+@router.get("/dashboard")
 def dashboard(limit: int = Query(default=200, ge=1, le=200),
               offset: int = Query(default=0, ge=0),
               db: Session = Depends(get_db),

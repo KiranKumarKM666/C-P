@@ -54,6 +54,26 @@ def init_db():
                         user.role = role
                 db.commit()
                 print("[DEPLOY] Demo account passwords synchronized explicitly.")
+
+            if os.getenv("SEED_DEMO_DATA", "").strip().lower() in ("1", "true", "yes"):
+                from app.models import Course
+
+                faculty = db.query(User).filter(User.email == "meera@college.edu").first()
+                faculty2 = db.query(User).filter(User.email == "ravi@college.edu").first()
+                demo_courses = [
+                    ("Data Structures", "CS301", 3, faculty),
+                    ("Database Systems", "CS302", 3, faculty2),
+                ]
+                for name, code, semester, owner in demo_courses:
+                    if owner and not db.query(Course).filter(Course.course_code == code).first():
+                        db.add(Course(
+                            course_name=name,
+                            course_code=code,
+                            semester=semester,
+                            faculty_id=owner.user_id,
+                        ))
+                db.commit()
+                print("[DEPLOY] Demo courses synchronized explicitly.")
         finally:
             db.close()
         print(f"[DEPLOY] Database initialized ({user_count} users present).")
