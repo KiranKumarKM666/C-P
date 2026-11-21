@@ -35,7 +35,21 @@ def init_db():
                 }
                 for email, (password, role) in password_by_role.items():
                     user = db.query(User).filter(User.email == email).first()
-                    if user:
+                    if not user:
+                        name = {
+                            "hod@college.edu": "Dr. HOD",
+                            "meera@college.edu": "Prof. Meera",
+                            "ravi@college.edu": "Prof. Ravi",
+                            "asha@college.edu": "Asha Rao",
+                        }[email]
+                        user = User(
+                            name=name,
+                            email=email,
+                            role=role,
+                            password_hash=hash_password(password),
+                        )
+                        db.add(user)
+                    else:
                         user.password_hash = hash_password(password)
                         user.role = role
                 db.commit()
