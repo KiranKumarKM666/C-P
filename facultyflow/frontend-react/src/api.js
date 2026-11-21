@@ -66,6 +66,9 @@ export async function login(email, password) {
 }
 export { getToken, clearToken, getUser }
 
+export const updateProfile = (body) => request('PUT', '/auth/me', body)
+export const forgotPassword = (body) => request('POST', '/auth/forgot-password', body)
+
 // ─── Courses ─────────────────────────────────────────────────────────────────
 export const getCourses = () => request('GET', '/courses')
 export const createCourse = (body) => request('POST', '/courses', body)
@@ -77,6 +80,7 @@ export const getDashboard = () => request('GET', '/dashboard')
 export const getStudents = (cid) => request('GET', `/courses/${cid}/students`)
 export const addStudent = (cid, body) => request('POST', `/courses/${cid}/students`, body)
 export const removeStudent = (cid, sid) => request('DELETE', `/courses/${cid}/students/${sid}`)
+export const updateStudent = (cid, sid, body) => request('PUT', `/courses/${cid}/students/${sid}`, body)
 export const uploadStudents = (cid, fd) => request('POST', `/courses/${cid}/students/upload`, fd, true)
 
 // ─── Attendance ──────────────────────────────────────────────────────────────
@@ -109,6 +113,10 @@ export const downloadReport = (type, params) => {
 // ─── Users (admin) ───────────────────────────────────────────────────────────
 export const getUsers = () => request('GET', '/users')
 export const createUser = (body) => request('POST', '/users', body)
+export const updateUser = (uid, body) => request('PUT', `/users/${uid}`, body)
+export const deleteUser = (uid) => request('DELETE', `/users/${uid}`)
+export const getPasswordRequests = () => request('GET', '/auth/password-requests')
+export const resolvePasswordRequest = (rid, body) => request('POST', `/auth/password-requests/${rid}/resolve`, body)
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 export const getSettings = () => request('GET', '/settings')

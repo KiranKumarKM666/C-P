@@ -19,6 +19,15 @@ logger = logging.getLogger("facultyflow")
 
 Base.metadata.create_all(bind=engine)
 
+# Lightweight SQLite upgrade for installations created before absence reasons existed.
+try:
+    with engine.begin() as conn:
+        cols = conn.execute(text("PRAGMA table_info(attendance)")).fetchall()
+        if cols and not any(row[1] == "reason" for row in cols):
+            conn.execute(text("ALTER TABLE attendance ADD COLUMN reason VARCHAR(240)"))
+except Exception:
+    logger.exception("Failed to apply attendance reason schema upgrade")
+
 app = FastAPI(title="FacultyFlow", version="1.0",
               description="AI drafts; the teacher always decides.")
 app.add_middleware(CORSMiddleware,

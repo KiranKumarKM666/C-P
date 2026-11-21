@@ -30,9 +30,11 @@ def save_attendance(body: AttendanceIn, db: Session = Depends(get_db),
     for r in body.records:
         if r.student_id in existing:
             existing[r.student_id].status = r.status
+            existing[r.student_id].reason = r.reason.strip() if r.reason and r.reason.strip() else None
         else:
             db.add(Attendance(student_id=r.student_id, course_id=body.course_id,
-                              date=body.date, status=r.status))
+                              date=body.date, status=r.status,
+                              reason=r.reason.strip() if r.reason and r.reason.strip() else None))
     db.commit()
     return {"saved": len(body.records), "date": body.date.isoformat()}
 
@@ -43,7 +45,8 @@ def attendance_for_date(course_id: int, date: dt.date, db: Session = Depends(get
     get_course_for_user(db, user, course_id)
     rows = db.query(Attendance).filter(Attendance.course_id == course_id,
                                        Attendance.date == date).all()
-    return [{"student_id": a.student_id, "status": a.status} for a in rows]
+    return [{"student_id": a.student_id, "status": a.status,
+             "reason": a.reason if hasattr(a, "reason") else None} for a in rows]
 
 
 @router.get("/courses/{course_id}/attendance-trend")

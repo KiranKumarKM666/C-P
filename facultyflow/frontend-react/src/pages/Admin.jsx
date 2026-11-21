@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react'
-import { getUsers, createUser, getSettings, updateSettings, getCourses, createCourse } from '../api.js'
+import {
+  getUsers, createUser, updateUser, deleteUser, getSettings, updateSettings,
+  getCourses, createCourse, getPasswordRequests, resolvePasswordRequest
+} from '../api.js'
 
 function Section({ title, children }) {
   return (
@@ -29,10 +32,15 @@ export default function Admin() {
   const [courseMsg, setCourseMsg] = useState('')
 
   const [err, setErr] = useState('')
+  const [resetRequests, setResetRequests] = useState([])
+  const [editingUser, setEditingUser] = useState(null)
 
   useEffect(() => {
     Promise.all([getSettings(), getUsers(), getCourses()])
-      .then(([s, u, c]) => { setSettings(s); setUsers(u); setCourses(c) })
+      .then(async ([s, u, c]) => {
+        setSettings(s); setUsers(u); setCourses(c)
+        try { setResetRequests(await getPasswordRequests()) } catch { setResetRequests([]) }
+      })
       .catch(ex => setErr(ex.message))
   }, [])
 
@@ -131,7 +139,7 @@ export default function Admin() {
 
         <div className="tbl-wrap mt-2">
           <table className="tbl">
-            <thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead>
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th className="text-right">Actions</th></tr></thead>
             <tbody>
               {users.map(u => (
                 <tr key={u.user_id}>
@@ -141,6 +149,18 @@ export default function Admin() {
                     background: u.role === 'admin' ? '#d8f3dc' : u.role === 'student' ? '#fef9c3' : '#e0f2fe',
                     color: u.role === 'admin' ? '#1b4332' : u.role === 'student' ? '#713f12' : '#0c4a6e',
                   }}>{u.role}</span></td>
+                  <td className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <button type="button" className="btn-ghost btn-sm" onClick={() => setEditingUser({ ...u, password: '' })}>Edit</button>
+                      <button type="button" className="btn-ghost btn-sm text-red-700" onClick={async () => {
+                        if (!window.confirm(`Delete ${u.name}?`)) return
+                        try {
+                          await deleteUser(u.user_id)
+                          setUsers(await getUsers())
+                        } catch (ex) { setErr(ex.message) }
+                      }}>Delete</button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -185,6 +205,67 @@ export default function Admin() {
           </table>
         </div>
       </Section>
+
+      <Section title="🔐 Password Help Requests">
+        {resetRequests.length === 0 ? (
+          <div className="text-sm" style={{ color: 'var(--text3)' }}>No password help requests.</div>
+        ) : (
+          <div className="tbl-wrap">
+            <table className="tbl">
+              <thead><tr><th>Email</th><th>Reason</th><th>Status</th><th className="text-right">Action</th></tr></thead>
+              <tbody>
+                {resetRequests.map(r => (
+                  <tr key={r.request_id}>
+                    <td>{r.email}</td>
+                    <td>{r.reason || 'Not specified'}</td>
+                    <td><span className="badge badge-advisory">{r.status}</span></td>
+                    <td className="text-right">
+                      {r.status === 'Pending' && (
+                        <button type="button" className="btn btn-sm" onClick={async () => {
+                          const password = window.prompt(`Set a temporary password for ${r.email}`)
+                          if (!password) return
+                          try {
+                            await resolvePasswordRequest(r.request_id, { new_password: password })
+                            setResetRequests(await getPasswordRequests())
+                          } catch (ex) { setErr(ex.message) }
+                        }}>Resolve</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Section>
+
+      {editingUser && (
+        <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setEditingUser(null)}>
+          <form className="modal-box flex flex-col gap-3"
+            onSubmit={async e => {
+              e.preventDefault()
+              try {
+                const body = { name: editingUser.name, email: editingUser.email, role: editingUser.role }
+                if (editingUser.password) body.password = editingUser.password
+                await updateUser(editingUser.user_id, body)
+                setUsers(await getUsers())
+                setEditingUser(null)
+              } catch (ex) { setErr(ex.message); setEditingUser(null) }
+            }}>
+            <h2 className="font-bold text-lg text-text">Edit account</h2>
+            <input className="inp" value={editingUser.name} onChange={e => setEditingUser(v => ({ ...v, name: e.target.value }))} />
+            <input className="inp" type="email" value={editingUser.email} onChange={e => setEditingUser(v => ({ ...v, email: e.target.value }))} />
+            <select className="inp" value={editingUser.role} onChange={e => setEditingUser(v => ({ ...v, role: e.target.value }))}>
+              <option value="faculty">Faculty</option><option value="admin">Admin / HOD</option><option value="student">Student</option>
+            </select>
+            <input className="inp" type="password" value={editingUser.password} onChange={e => setEditingUser(v => ({ ...v, password: e.target.value }))} placeholder="New password (optional)" />
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn-ghost" onClick={() => setEditingUser(null)}>Cancel</button>
+              <button type="submit" className="btn">Save account</button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   )
 }

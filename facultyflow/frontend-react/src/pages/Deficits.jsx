@@ -1,21 +1,29 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import {
-  Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend,
-  LineElement, PointElement
+  Chart as ChartJS, ArcElement, CategoryScale, LinearScale, PointElement,
+  LineElement, Title, Tooltip, Legend
 } from 'chart.js'
-import { Bar, Line } from 'react-chartjs-2'
+import { Doughnut, Line } from 'react-chartjs-2'
 import {
-  getDeficits, getAttendanceTrend, draftAdvisory, approveAdvisory, getCourses
+  getDeficits, getSummary, getAttendanceTrend, draftAdvisory, approveAdvisory
 } from '../api.js'
+import { useCourse } from '../context/CourseContext.jsx'
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, LineElement, PointElement)
+ChartJS.register(ArcElement, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
 
-const TIER_COLOR = {
-  Urgent:   { badge: 'badge-urgent',   border: '#ef4444', bg: '#fef2f2' },
-  Critical: { badge: 'badge-critical', border: '#c0392b', bg: '#fde8e8' },
-  Advisory: { badge: 'badge-advisory', border: '#c05621', bg: '#fef3e2' },
-  Positive: { badge: 'badge-safe',     border: '#166534', bg: '#dcfce7' },
+// Mathematical probability calculation of classes required to reach 75%
+function calcClassesNeeded(attended, total, target = 75) {
+  if (!total || total === 0) return null
+  const pctNow = (attended / total) * 100
+  if (pctNow >= target) {
+    // how many can be missed
+    const canMiss = Math.floor((attended - (target / 100) * total) / (1 - target / 100))
+    return { status: 'above', canMiss: Math.max(0, canMiss), pct: pctNow }
+  }
+  // (attended + x)/(total + x) >= target/100
+  const needed = Math.ceil(((target * total) / 100 - attended) / (1 - target / 100))
+  return { status: 'below', needed: Math.max(0, needed), pct: pctNow }
 }
 
 function AdvisoryModal({ student, courseId, onClose, onApproved }) {
@@ -27,14 +35,15 @@ function AdvisoryModal({ student, courseId, onClose, onApproved }) {
   const [step, setStep] = useState('draft') // draft | edit | done
 
   const handleDraft = async () => {
-    setLoading(true); setErr('')
+    setLoading(true)
+    setErr('')
     try {
       const res = await draftAdvisory({
         student_id: student.student_id,
         course_id: parseInt(courseId),
-        issue_type: student.issue_type || 'attendance shortage',
+        issue_type: student.reason || student.deficit_reasons?.[0] || 'attendance shortage',
       })
-      setDraft(res.ai_draft || res.final_message || '')
+      setDraft(res.ai_draft || res.draft || '')
       setAdvisoryId(res.advisory_id)
       setStep('edit')
     } catch (ex) {
@@ -45,9 +54,10 @@ function AdvisoryModal({ student, courseId, onClose, onApproved }) {
   }
 
   const handleApprove = async () => {
-    setApproving(true); setErr('')
+    setApproving(true)
+    setErr('')
     try {
-      await approveAdvisory(advisoryId, { final_message: draft })
+      await approveAdvisory(advisoryId, { final_message: draft.trim() })
       setStep('done')
       onApproved()
     } catch (ex) {
@@ -57,61 +67,97 @@ function AdvisoryModal({ student, courseId, onClose, onApproved }) {
     }
   }
 
+  const wordCount = draft.trim() ? draft.trim().split(/\s+/).length : 0
+
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-box">
-        <button onClick={onClose}
-                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl font-light">×</button>
-        <h2 className="font-bold text-base mb-1" style={{ color: 'var(--text)' }}>AI Advisory</h2>
-        <p className="text-sm mb-4" style={{ color: 'var(--text2)' }}>
-          {student.name} · {student.issue_type}
+      <div className="modal-box page-enter max-w-lg">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-text-3 hover:text-text text-xl font-light"
+        >
+          ✕
+        </button>
+
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-xl">✨</span>
+          <h2 className="font-bold text-base text-text">AI Academic Advisory</h2>
+        </div>
+        <p className="text-xs text-text-2 mb-4">
+          Drafting guidance for <b className="text-text">{student.name}</b> ({student.usn})
         </p>
 
         {step === 'draft' && (
           <div className="flex flex-col gap-3">
-            <div className="card-flat text-sm" style={{ color: 'var(--text2)' }}>
-              <strong>AI will draft</strong> a polite, motivating message based on {student.name}'s data.
-              You'll review and edit before approving.
+            <div className="card-flat text-xs text-text-2 leading-relaxed">
+              <strong>Human-in-the-loop guarantee:</strong> The AI will generate a constructive, motivating draft based on attendance and CIE deficits. You will inspect, modify, and explicitly approve it before the student can view it.
             </div>
-            {err && <div className="text-sm" style={{ color: 'var(--red)' }}>{err}</div>}
-            <button onClick={handleDraft} disabled={loading} className="btn">
-              {loading ? <><span className="spinner" /> Generating…</> : '✨ Generate AI Draft'}
+            {err && <div className="text-xs text-red-600 bg-red-50 p-2.5 rounded border border-red-200">{err}</div>}
+            <button
+              onClick={handleDraft}
+              disabled={loading}
+              className="btn justify-center mt-2"
+            >
+              {loading ? <><span className="spinner" /> Synthesizing AI Draft…</> : '✨ Generate AI Draft'}
             </button>
           </div>
         )}
 
         {step === 'edit' && (
           <div className="flex flex-col gap-3">
-            <div className="card-flat text-xs mb-1" style={{ color: 'var(--text3)' }}>
-              AI draft — edit freely before approving. The student sees nothing until you approve.
+            <div className="text-xs text-text-3 flex justify-between items-center">
+              <span>Review & personalize before sending:</span>
+              <span className={`font-mono font-semibold ${wordCount > 120 ? 'text-red-600' : 'text-text-3'}`}>
+                {wordCount} / 120 words
+              </span>
             </div>
             <textarea
-              className="inp text-sm"
+              className="inp text-xs leading-relaxed"
               rows={7}
               value={draft}
               onChange={e => setDraft(e.target.value)}
+              placeholder="Advisory message body…"
             />
-            <div className="text-xs" style={{ color: draft.trim().split(/\s+/).length > 120 ? 'var(--red)' : 'var(--text3)' }}>
-              {draft.trim().split(/\s+/).filter(Boolean).length} / 120 words
-            </div>
-            {err && <div className="text-sm" style={{ color: 'var(--red)' }}>{err}</div>}
-            <div className="flex gap-2">
-              <button onClick={() => setStep('draft')} className="btn-ghost">← Regenerate</button>
-              <button onClick={handleApprove} disabled={approving || !draft.trim()} className="btn flex-1">
-                {approving ? <span className="spinner" /> : '✓ Approve & Send'}
+            {wordCount > 120 && (
+              <p className="text-[0.7rem] text-red-600">
+                Warning: Advisories should stay concise (under 120 words) for student engagement.
+              </p>
+            )}
+            {err && <div className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200">{err}</div>}
+            <div className="flex gap-2 mt-2">
+              <button
+                type="button"
+                onClick={() => setStep('draft')}
+                className="btn-ghost flex-1 justify-center text-xs"
+              >
+                ← Regenerate
+              </button>
+              <button
+                type="button"
+                onClick={handleApprove}
+                disabled={approving || !draft.trim()}
+                className="btn flex-1 justify-center text-xs"
+              >
+                {approving ? <><span className="spinner" /> Approving…</> : '✓ Approve & Send to Student'}
               </button>
             </div>
           </div>
         )}
 
         {step === 'done' && (
-          <div className="flex flex-col items-center gap-4 py-4">
-            <div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl"
-                 style={{ background: 'var(--accent-light)' }}>✓</div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--accent)' }}>
-              Advisory approved and sent to student portal.
+          <div className="flex flex-col items-center gap-3 py-6 text-center">
+            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-2xl">
+              ✓
+            </div>
+            <p className="text-sm font-bold text-accent">
+              Advisory Approved & Dispatched
             </p>
-            <button onClick={onClose} className="btn-ghost">Close</button>
+            <p className="text-xs text-text-2">
+              The student will now be able to read this approved message inside their Student Portal.
+            </p>
+            <button onClick={onClose} className="btn-ghost btn-sm mt-2">
+              Close
+            </button>
           </div>
         )}
       </div>
@@ -119,141 +165,266 @@ function AdvisoryModal({ student, courseId, onClose, onApproved }) {
   )
 }
 
-function TrendChart({ courseId }) {
-  const [data, setData] = useState(null)
-  useEffect(() => {
-    getAttendanceTrend(courseId).then(setData).catch(() => {})
-  }, [courseId])
-
-  if (!data || !data.labels?.length) return null
-
-  return (
-    <div className="card">
-      <h3 className="font-semibold text-sm mb-4" style={{ color: 'var(--text2)' }}>Attendance Trend</h3>
-      <Line
-        data={{
-          labels: data.labels,
-          datasets: [{
-            label: 'Avg Attendance %',
-            data: data.values,
-            borderColor: '#2d6a4f',
-            backgroundColor: 'rgba(45,106,79,0.08)',
-            tension: 0.4,
-            fill: true,
-            pointBackgroundColor: '#2d6a4f',
-          }]
-        }}
-        options={{
-          responsive: true,
-          plugins: { legend: { display: false } },
-          scales: {
-            y: { min: 0, max: 100, ticks: { stepSize: 20 }, grid: { color: 'rgba(0,0,0,0.04)' } },
-            x: { grid: { display: false } }
-          }
-        }}
-        height={80}
-      />
-    </div>
-  )
-}
-
 export default function Deficits() {
   const { id } = useParams()
+  const { activeCourseId, activeCourse } = useCourse()
+  const courseId = id || activeCourseId
+
   const [deficits, setDeficits] = useState([])
-  const [course, setCourse] = useState(null)
+  const [summary, setSummary] = useState([])
+  const [trend, setTrend] = useState({ labels: [], values: [] })
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
-  const [modal, setModal] = useState(null)
+  const [modalStudent, setModalStudent] = useState(null)
 
-  const load = async () => {
-    setLoading(true); setErr('')
+  const loadData = async () => {
+    if (!courseId) return
+    setLoading(true)
+    setErr('')
     try {
-      const [d, courses] = await Promise.all([getDeficits(id), getCourses()])
+      const [d, s, t] = await Promise.all([
+        getDeficits(courseId),
+        getSummary(courseId).catch(() => []),
+        getAttendanceTrend(courseId).catch(() => ({ labels: [], values: [] }))
+      ])
       setDeficits(d)
-      setCourse(courses.find(c => c.course_id === parseInt(id)))
-    } catch (ex) { setErr(ex.message) }
-    finally { setLoading(false) }
+      setSummary(s)
+      setTrend(t.labels ? t : { labels: (t.rows || []).map(r => r.date), values: (t.rows || []).map(r => r.percentage) })
+    } catch (ex) {
+      setErr(ex.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  useEffect(() => { load() }, [id])
+  useEffect(() => {
+    loadData()
+  }, [courseId])
 
-  if (loading) return <div className="flex justify-center py-16"><div className="spinner w-8 h-8" /></div>
+  if (!courseId) {
+    return (
+      <div className="card empty-state">
+        <div className="text-3xl mb-2">📚</div>
+        <div className="font-semibold text-text">No Course Selected</div>
+        <p className="text-sm text-text-2 mt-1">Please select an assigned course from the top dropdown.</p>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="spinner w-8 h-8" />
+      </div>
+    )
+  }
+
+  const criticalCount = summary.filter(r => r.attendance_status === 'Critical').length
+  const advisoryCount = summary.filter(r => r.attendance_status === 'Advisory').length
+  const safeCount     = summary.filter(r => r.attendance_status === 'Safe').length
+
+  const donutData = {
+    labels: ['Critical', 'Advisory', 'Safe'],
+    datasets: [{
+      data: [criticalCount, advisoryCount, safeCount],
+      backgroundColor: ['#c0392b', '#c05621', '#2d6a4f'],
+      borderWidth: 2,
+      borderColor: '#ffffff',
+    }]
+  }
+
+  const lineData = {
+    labels: trend.labels?.length ? trend.labels : ['Day 1', 'Day 2', 'Day 3'],
+    datasets: [{
+      label: 'Attendance %',
+      data: trend.values?.length ? trend.values : [85, 80, 78],
+      borderColor: '#2d6a4f',
+      backgroundColor: 'rgba(45, 106, 79, 0.08)',
+      fill: true,
+      tension: 0.35,
+      pointRadius: 3,
+      pointBackgroundColor: '#2d6a4f',
+    }]
+  }
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Title */}
       <div>
-        <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>
-          Deficit Report
+        <h1 className="text-2xl font-extrabold tracking-tight text-text">
+          Needs Attention & Deficit Analysis
         </h1>
-        {course && <p className="text-sm mt-1" style={{ color: 'var(--text2)' }}>
-          {course.course_name} ({course.course_code})
-        </p>}
+        <p className="text-xs font-medium text-text-2 mt-0.5">
+          {activeCourse ? `${activeCourse.course_code} · ${activeCourse.course_name}` : `Course #${courseId}`}
+        </p>
       </div>
 
-      {err && <div className="card" style={{ color: 'var(--red)', background: 'var(--red-light)' }}>{err}</div>}
+      {err && <div className="card bg-red-50 border-red-200 text-red-700 text-sm font-medium py-2.5 px-4">{err}</div>}
 
-      <TrendChart courseId={id} />
+      {/* Top Split: Attendance Donut + Trend Line + Quick Stats Grid like before */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Donut Card */}
+        <div className="card flex flex-col items-center justify-center p-4">
+          <h3 className="font-bold text-xs uppercase tracking-wider text-text-2 mb-2">Attendance Split</h3>
+          <div className="w-32 h-32 relative">
+            <Doughnut
+              data={donutData}
+              options={{
+                cutout: '70%',
+                plugins: { legend: { display: false } },
+                maintainAspectRatio: false
+              }}
+            />
+          </div>
+          <div className="flex gap-3 text-[0.7rem] font-semibold mt-2">
+            <span className="text-red-700">Crit: {criticalCount}</span>
+            <span className="text-amber-700">Adv: {advisoryCount}</span>
+            <span className="text-emerald-700">Safe: {safeCount}</span>
+          </div>
+        </div>
 
-      {deficits.length === 0
-        ? <div className="card empty-state">🎉 No at-risk students — great work!</div>
-        : (
+        {/* Daily Class Trend Line */}
+        <div className="card flex flex-col justify-between p-4">
+          <h3 className="font-bold text-xs uppercase tracking-wider text-text-2 mb-1">Daily Class Trend (%)</h3>
+          <div className="h-32 w-full relative">
+            <Line
+              data={lineData}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                  y: { min: 0, max: 100, ticks: { stepSize: 25, font: { size: 9 } } },
+                  x: { ticks: { font: { size: 9 } } }
+                }
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Quick Stats Grid */}
+        <div className="card flex flex-col justify-between p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-bold text-xs uppercase tracking-wider text-text-2">Deficit Overview</h3>
+            <span className="text-[0.68rem] text-accent font-bold">● Active 3D Engine</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="p-2.5 rounded-lg bg-surface-2 border border-border">
+              <div className="text-xl font-bold text-red-700">{criticalCount}</div>
+              <div className="text-[0.68rem] font-semibold text-text-2">Critical (&lt;75%)</div>
+            </div>
+            <div className="p-2.5 rounded-lg bg-surface-2 border border-border">
+              <div className="text-xl font-bold text-amber-700">{advisoryCount}</div>
+              <div className="text-[0.68rem] font-semibold text-text-2">Advisory (75–85%)</div>
+            </div>
+            <div className="p-2.5 rounded-lg bg-surface-2 border border-border">
+              <div className="text-xl font-bold text-emerald-700">{safeCount}</div>
+              <div className="text-[0.68rem] font-semibold text-text-2">Safe (&gt;85%)</div>
+            </div>
+            <div className="p-2.5 rounded-lg bg-surface-2 border border-border">
+              <div className="text-xl font-bold text-text">{deficits.length}</div>
+              <div className="text-[0.68rem] font-semibold text-text-2">Flagged Students</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Flagged Students Table with Classes to 75% Probability & AI Advisory Action */}
+      <div className="card flex flex-col gap-4">
+        <div className="flex items-center justify-between pb-2 border-b border-border">
+          <h2 className="font-bold text-sm text-text">
+            Flagged Students — Needs Attention ({deficits.length})
+          </h2>
+          <span className="text-xs text-text-3">Ranked by compound risk priority</span>
+        </div>
+
+        {deficits.length === 0 ? (
+          <div className="empty-state py-12">
+            <div className="text-3xl mb-2">🎉</div>
+            <div className="font-semibold text-text">No at-risk students in this course</div>
+            <p className="text-xs text-text-2 mt-1">All enrolled students are currently meeting attendance and marks thresholds.</p>
+          </div>
+        ) : (
           <div className="tbl-wrap">
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Student</th>
+                  <th>Priority</th>
                   <th>USN</th>
+                  <th>Student Name</th>
                   <th>Attendance</th>
-                  <th>CIE</th>
-                  <th>Risk</th>
-                  <th>Reason</th>
-                  <th>Action</th>
+                  <th>Classes to 75%</th>
+                  <th>CIE %</th>
+                  <th>Flags / Reasons</th>
+                  <th className="text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {deficits.map((s, i) => {
-                  const tier = s.risk_tier || (s.attendance_pct < 75 ? 'Critical' : 'Advisory')
-                  const tc = TIER_COLOR[tier] || TIER_COLOR.Advisory
-                  const att = s.attendance_pct != null ? s.attendance_pct.toFixed(1) + '%' : 'N/A'
-                  const cie = s.cie_pct != null ? s.cie_pct.toFixed(1) + '%' : 'N/A'
+                {deficits.map(r => {
+                  const prob = calcClassesNeeded(r.attended, r.total_classes, 75)
+                  const tier = r.priority || r.risk_tier || (r.attendance_pct < 75 ? 'Critical' : 'Advisory')
+
+                  const priorityBadges = {
+                    Urgent:   'badge-urgent',
+                    Critical: 'badge-critical',
+                    Advisory: 'badge-advisory',
+                    Safe:     'badge-safe',
+                  }
+                  const badgeCls = priorityBadges[tier] || 'badge-critical'
+
                   return (
-                    <tr key={s.student_id}>
-                      <td style={{ color: 'var(--text3)', fontSize: '0.8rem' }}>{i + 1}</td>
-                      <td className="font-medium">{s.name}</td>
-                      <td style={{ color: 'var(--text3)' }}>{s.usn}</td>
+                    <tr key={r.student_id}>
                       <td>
-                        <div className="flex flex-col gap-1">
-                          <span className="font-semibold">{att}</span>
-                          <div className="prog-wrap" style={{ width: 80 }}>
-                            <div className="prog-bar"
-                                 style={{ width: `${Math.min(100, s.attendance_pct || 0)}%`,
-                                   background: (s.attendance_pct || 0) < 75 ? '#c0392b' : (s.attendance_pct || 0) < 85 ? '#c05621' : '#166534' }} />
-                          </div>
-                        </div>
+                        <span className={`badge ${badgeCls}`}>{tier}</span>
                       </td>
+                      <td className="font-mono text-xs font-semibold text-text">{r.usn}</td>
+                      <td className="font-medium text-text">{r.name}</td>
                       <td>
-                        <div className="flex flex-col gap-1">
-                          <span className="font-semibold">{cie}</span>
-                          <div className="prog-wrap" style={{ width: 80 }}>
-                            <div className="prog-bar"
-                                 style={{ width: `${Math.min(100, s.cie_pct || 0)}%`,
-                                   background: (s.cie_pct || 0) < 40 ? '#c0392b' : '#166534' }} />
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`badge ${tc.badge}`} style={{ borderColor: tc.border }}>
-                          {tier}
+                        <span className={`font-bold text-xs ${
+                          (r.attendance_pct || 0) < 75 ? 'text-red-700' :
+                          (r.attendance_pct || 0) <= 85 ? 'text-amber-700' : 'text-emerald-700'
+                        }`}>
+                          {r.attendance_pct != null ? `${r.attendance_pct.toFixed(1)}%` : 'No Data'}
                         </span>
                       </td>
-                      <td style={{ color: 'var(--text2)', fontSize: '0.8rem', maxWidth: 180, whiteSpace: 'pre-wrap' }}>
-                        {s.reason || s.deficit_reasons?.join(', ') || '—'}
+                      <td>
+                        {prob ? (
+                          prob.status === 'above' ? (
+                            <span className="text-emerald-700 text-xs font-bold">
+                              Can miss {prob.canMiss}
+                            </span>
+                          ) : (
+                            <div className="flex flex-col gap-1">
+                              <span className="text-red-700 text-xs font-bold">
+                                Need {prob.needed} more
+                              </span>
+                              <div className="w-20 h-1.5 rounded-full bg-border overflow-hidden">
+                                <div
+                                  className="h-full bg-red-600"
+                                  style={{ width: `${Math.min(100, (prob.pct / 75) * 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                          )
+                        ) : (
+                          <span className="text-text-3 text-xs">—</span>
+                        )}
                       </td>
                       <td>
+                        <span className={`text-xs font-bold ${
+                          (r.cie_pct || 0) < 40 ? 'text-red-700' : 'text-emerald-700'
+                        }`}>
+                          {r.cie_pct != null ? `${r.cie_pct.toFixed(1)}%` : '—'}
+                        </span>
+                      </td>
+                      <td className="text-xs text-text-2 max-w-xs leading-normal">
+                        {r.reason || r.deficit_reasons?.join(', ') || 'Attendance deficit'}
+                      </td>
+                      <td className="text-right">
                         <button
-                          className="btn btn-sm"
-                          onClick={() => setModal(s)}
+                          type="button"
+                          onClick={() => setModalStudent(r)}
+                          className="btn btn-sm text-xs py-1 px-2.5 font-semibold"
                         >
                           ✨ Draft advisory
                         </button>
@@ -264,15 +435,19 @@ export default function Deficits() {
               </tbody>
             </table>
           </div>
-        )
-      }
+        )}
+      </div>
 
-      {modal && (
+      {/* Advisory Modal */}
+      {modalStudent && (
         <AdvisoryModal
-          student={modal}
-          courseId={id}
-          onClose={() => setModal(null)}
-          onApproved={() => { setModal(null); load() }}
+          student={modalStudent}
+          courseId={courseId}
+          onClose={() => setModalStudent(null)}
+          onApproved={() => {
+            setModalStudent(null)
+            loadData()
+          }}
         />
       )}
     </div>

@@ -45,6 +45,7 @@ class Attendance(Base):
     course_id = Column(Integer, ForeignKey("courses.course_id"), nullable=False)
     date = Column(Date, nullable=False)
     status = Column(String(10), nullable=False)  # Present | Absent
+    reason = Column(String(240))
     __table_args__ = (
         UniqueConstraint("student_id", "course_id", "date", name="uq_attendance_day"),
         Index("ix_attendance_student_course", "student_id", "course_id"),
@@ -77,3 +78,12 @@ class Advisory(Base):
     faculty_approved = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     approved_at = Column(DateTime)
+
+
+class PasswordResetRequest(Base):
+    __tablename__ = "password_reset_requests"
+    request_id = Column(Integer, primary_key=True)
+    email = Column(String(120), nullable=False, index=True)
+    reason = Column(String(240))
+    status = Column(String(20), default="Pending", nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

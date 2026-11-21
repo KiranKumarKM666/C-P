@@ -40,6 +40,7 @@ class StudentCreate(BaseModel):
 class AttendanceRecord(BaseModel):
     student_id: int
     status: Literal["Present", "Absent"]
+    reason: Optional[str] = None
 
 
 class AttendanceIn(BaseModel):
@@ -125,3 +126,19 @@ class SettingsIn(BaseModel):
         if self.critical_below > self.advisory_upto:
             raise ValueError("Critical threshold cannot be higher than the advisory threshold")
         return self
+
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1)
+    email: Optional[str] = None
+    password: Optional[str] = Field(default=None, min_length=6)
+    role: Optional[Literal["faculty", "admin", "student"]] = None
+
+
+class PasswordResetRequestIn(BaseModel):
+    email: str
+    reason: Optional[str] = None
+
+
+class PasswordResetResolveIn(BaseModel):
+    new_password: str = Field(min_length=6)

@@ -78,6 +78,26 @@ def delete_student(course_id: int, student_id: int, db: Session = Depends(get_db
     return {"deleted": student_id}
 
 
+@router.put("/courses/{course_id}/students/{student_id}")
+def update_student(course_id: int, student_id: int, body: StudentCreate,
+                   db: Session = Depends(get_db),
+                   user: User = Depends(require_role(*STAFF))):
+    get_course_for_user(db, user, course_id)
+    s = db.get(Student, student_id)
+    if not s or s.course_id != course_id:
+        raise HTTPException(404, "Student not found in this course")
+    usn = body.usn.strip().upper()
+    existing = db.query(Student).filter(Student.usn == usn, Student.student_id != student_id).first()
+    if existing:
+        raise HTTPException(409, f"USN {usn} already exists")
+    s.usn = usn
+    s.name = body.name.strip()
+    s.email = body.email.strip().lower() if body.email else None
+    db.commit()
+    db.refresh(s)
+    return {"student_id": s.student_id, "usn": s.usn, "name": s.name, "email": s.email}
+
+
 @router.post("/courses/{course_id}/students/upload")
 def upload_students(course_id: int, file: UploadFile = File(...), db: Session = Depends(get_db),
                     user: User = Depends(require_role(*STAFF))):

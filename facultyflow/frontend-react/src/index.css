@@ -30,6 +30,18 @@
     --radius-sm: 6px;
   }
 
+  :root[data-theme='dark'] {
+    --bg: #07120d;
+    --surface: #0d1b14;
+    --surface2: #11251a;
+    --border: #1f3a2b;
+    --border2: #365744;
+    --text: #edf7f1;
+    --text2: #b4c7bc;
+    --text3: #7f998a;
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+  }
+
   * { box-sizing: border-box; }
   body {
     font-family: 'Inter', system-ui, sans-serif;

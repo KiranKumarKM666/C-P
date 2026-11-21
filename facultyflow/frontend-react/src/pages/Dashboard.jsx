@@ -1,181 +1,205 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
-import { Doughnut } from 'react-chartjs-2'
-import { getCourses, getDashboard, getUser } from '../api.js'
-
-ChartJS.register(ArcElement, Tooltip, Legend)
-
-function StatCard({ label, value, sub, color }) {
-  return (
-    <div className="stat-card">
-      <div className="stat-label">{label}</div>
-      <div className="stat-value" style={{ color: color || 'var(--text)' }}>{value}</div>
-      {sub && <div className="stat-sub">{sub}</div>}
-    </div>
-  )
-}
-
-function RiskDoughnut({ data }) {
-  const critical = data.reduce((s, c) => s + (c.critical_count || 0), 0)
-  const advisory = data.reduce((s, c) => s + (c.advisory_count || 0), 0)
-  const lowCie   = data.reduce((s, c) => s + (c.low_cie_count || 0), 0)
-  const safe = Math.max(0, (data.reduce((s, c) => s + (c.total_students || 0), 0)) - critical - advisory)
-
-  return (
-    <div className="card flex flex-col gap-4">
-      <h3 className="font-semibold text-sm" style={{ color: 'var(--text2)' }}>Risk Distribution</h3>
-      <div className="flex items-center gap-6">
-        <div style={{ width: 140, height: 140 }}>
-          <Doughnut
-            data={{
-              labels: ['Critical', 'Advisory', 'Low CIE', 'Safe'],
-              datasets: [{
-                data: [critical, advisory, lowCie, safe],
-                backgroundColor: ['#c0392b', '#c05621', '#92400e', '#166534'],
-                borderWidth: 2,
-                borderColor: '#fff',
-              }]
-            }}
-            options={{
-              cutout: '68%',
-              plugins: { legend: { display: false }, tooltip: { enabled: true } },
-            }}
-          />
-        </div>
-        <div className="flex flex-col gap-2 text-sm">
-          {[
-            { label: 'Critical', val: critical, color: '#c0392b' },
-            { label: 'Advisory', val: advisory, color: '#c05621' },
-            { label: 'Low CIE',  val: lowCie,   color: '#92400e' },
-            { label: 'Safe',     val: safe,      color: '#166534' },
-          ].map(r => (
-            <div key={r.label} className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full" style={{ background: r.color }} />
-              <span style={{ color: 'var(--text2)' }}>{r.label}</span>
-              <span className="font-bold ml-auto pl-4" style={{ color: 'var(--text)' }}>{r.val}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { getDashboard, getUser } from '../api.js'
+import { useCourse } from '../context/CourseContext.jsx'
+import ThreeHoloSphere from '../components/ThreeHoloSphere.jsx'
 
 export default function Dashboard() {
   const navigate = useNavigate()
   const user = getUser()
-  const [courses, setCourses] = useState([])
-  const [dash, setDash] = useState([])
+  const { setActiveCourseId } = useCourse()
+  const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
 
-  const load = useCallback(async () => {
-    setLoading(true); setErr('')
-    try {
-      const [c, d] = await Promise.all([getCourses(), getDashboard()])
-      setCourses(c)
-      setDash(d)
-    } catch (ex) {
-      setErr(ex.message)
-    } finally {
-      setLoading(false)
-    }
+  useEffect(() => {
+    getDashboard()
+      .then(setData)
+      .catch(ex => setErr(ex.message))
+      .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => { load() }, [load])
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="spinner w-8 h-8" />
+      </div>
+    )
+  }
 
-  const totalStudents = dash.reduce((s, c) => s + (c.total_students || 0), 0)
-  const totalCritical = dash.reduce((s, c) => s + (c.critical_count || 0), 0)
-  const totalAdvisory = dash.reduce((s, c) => s + (c.advisory_count || 0), 0)
-
-  if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="spinner w-8 h-8" />
-    </div>
-  )
+  const totalStudents = data.reduce((s, c) => s + (c.student_count || c.total_students || 0), 0)
+  const totalCritical = data.reduce((s, c) => s + (c.critical || c.critical_count || 0), 0)
+  const totalFlagged  = data.reduce((s, c) => s + (c.flagged || 0), 0)
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>
-          Welcome, {user?.name?.split(' ')[0]} 👋
-        </h1>
-        <p className="text-sm mt-1" style={{ color: 'var(--text2)' }}>
-          {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        </p>
+      {/* Welcome Banner */}
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight text-text">
+            Department Academic Overview
+          </h1>
+          <p className="text-xs font-medium text-text-2 mt-0.5">
+            Welcome back, <b className="text-text">{user?.name}</b> · Continuous Evaluation & Intelligence
+          </p>
+        </div>
       </div>
 
-      {err && <div className="card" style={{ color: 'var(--red)', background: 'var(--red-light)' }}>{err}</div>}
+      {err && <div className="card bg-red-50 border-red-200 text-red-700 text-sm font-medium py-2.5 px-4">{err}</div>}
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Courses"  value={courses.length}  sub="assigned" />
-        <StatCard label="Students" value={totalStudents}   sub="enrolled" />
-        <StatCard label="Critical" value={totalCritical}   sub="below 75%" color="var(--red)" />
-        <StatCard label="Advisory" value={totalAdvisory}   sub="75–85%" color="var(--orange)" />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Courses Table */}
-        <div className="lg:col-span-2 card flex flex-col gap-4">
-          <h2 className="font-semibold" style={{ color: 'var(--text)' }}>Your Courses</h2>
-          {courses.length === 0
-            ? <div className="empty-state">No courses assigned yet.</div>
-            : (
-              <div className="tbl-wrap">
-                <table className="tbl">
-                  <thead>
-                    <tr>
-                      <th>Course</th>
-                      <th>Code</th>
-                      <th>Sem</th>
-                      <th>Critical</th>
-                      <th>Advisory</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {courses.map(c => {
-                      const d = dash.find(r => r.course_id === c.course_id) || {}
-                      return (
-                        <tr key={c.course_id}>
-                          <td className="font-medium">{c.course_name}</td>
-                          <td>{c.course_code}</td>
-                          <td>{c.semester}</td>
-                          <td>
-                            {d.critical_count > 0
-                              ? <span className="badge badge-critical">{d.critical_count}</span>
-                              : <span style={{ color: 'var(--text3)' }}>—</span>
-                            }
-                          </td>
-                          <td>
-                            {d.advisory_count > 0
-                              ? <span className="badge badge-advisory">{d.advisory_count}</span>
-                              : <span style={{ color: 'var(--text3)' }}>—</span>
-                            }
-                          </td>
-                          <td>
-                            <div className="flex flex-wrap gap-1.5">
-                              <button className="btn btn-sm" onClick={() => navigate(`/courses/${c.course_id}/deficits`)}>Deficits</button>
-                              <button className="btn-ghost btn-sm" onClick={() => navigate(`/courses/${c.course_id}/attendance`)}>Attendance</button>
-                              <button className="btn-ghost btn-sm" onClick={() => navigate(`/courses/${c.course_id}/marks`)}>Marks</button>
-                              <button className="btn-ghost btn-sm" onClick={() => navigate(`/courses/${c.course_id}/reports`)}>Reports</button>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )
-          }
+      {/* Stats Row + 3D Holographic Sphere */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="stat-card">
+          <div className="stat-label">Active Courses</div>
+          <div className="stat-value text-accent">{data.length}</div>
+          <div className="stat-sub">Assigned curriculum</div>
         </div>
 
-        {/* Doughnut */}
-        {dash.length > 0 && <RiskDoughnut data={dash} />}
+        <div className="stat-card">
+          <div className="stat-label">Total Students</div>
+          <div className="stat-value text-text">{totalStudents}</div>
+          <div className="stat-sub">Enrolled learners</div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-label">Critical Attendance</div>
+          <div className="stat-value text-red-700">{totalCritical}</div>
+          <div className="stat-sub">&lt; 75% threshold</div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-label">Total Flagged</div>
+          <div className="stat-value text-amber-700">{totalFlagged}</div>
+          <div className="stat-sub">Requiring attention</div>
+        </div>
+
+        {/* 3D Interactive Holographic Sphere Component */}
+        <div className="sm:col-span-2 lg:col-span-1">
+          <ThreeHoloSphere
+            label="3D Matrix Health"
+            value={`${Math.max(0, 100 - (totalCritical * 4))}%`}
+            sub="Neural Monitor"
+          />
+        </div>
+      </div>
+
+      {/* Course Breakdown Table like before */}
+      <div className="card flex flex-col gap-4">
+        <div className="flex items-center justify-between pb-2 border-b border-border">
+          <div>
+            <h2 className="font-bold text-sm text-text">Course Breakdown & Performance</h2>
+            <p className="text-xs text-text-2 mt-0.5">Select a course to inspect attendance, scores, and deficits</p>
+          </div>
+          <span className="badge badge-safe">{data.length} Courses</span>
+        </div>
+
+        {data.length === 0 ? (
+          <div className="empty-state py-12">
+            <div className="text-3xl mb-2">📚</div>
+            <div className="font-semibold text-text">No courses assigned yet</div>
+            <p className="text-xs text-text-2 mt-1">Courses created in the Admin panel will appear here.</p>
+          </div>
+        ) : (
+          <div className="tbl-wrap">
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Course Code & Name</th>
+                  <th>Faculty</th>
+                  <th className="text-center">Students</th>
+                  <th className="text-center">Critical</th>
+                  <th className="text-center">Advisory</th>
+                  <th className="text-center">Low CIE</th>
+                  <th className="text-center">Flagged</th>
+                  <th className="text-right">Jump to</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.map(c => {
+                  const crit = c.critical || c.critical_count || 0
+                  const adv  = c.advisory || c.advisory_count || 0
+                  const low  = c.low_cie || c.low_cie_count || 0
+                  const flag = c.flagged || 0
+
+                  return (
+                    <tr key={c.course_id} className="hover:bg-surface-2 transition-colors">
+                      <td>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-xs text-text">{c.course_code}</span>
+                          <span className="text-xs text-text-2 font-medium">{c.course_name}</span>
+                        </div>
+                      </td>
+                      <td className="text-xs font-medium text-text-2">{c.faculty_name || 'Assigned'}</td>
+                      <td className="text-center font-bold text-xs text-text">{c.student_count || c.total_students || 0}</td>
+                      <td className="text-center">
+                        {crit > 0 ? (
+                          <span className="badge badge-critical text-[0.68rem]">{crit}</span>
+                        ) : (
+                          <span className="text-text-3 text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="text-center">
+                        {adv > 0 ? (
+                          <span className="badge badge-advisory text-[0.68rem]">{adv}</span>
+                        ) : (
+                          <span className="text-text-3 text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="text-center">
+                        {low > 0 ? (
+                          <span className="badge badge-urgent text-[0.68rem]">{low}</span>
+                        ) : (
+                          <span className="text-text-3 text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="text-center">
+                        {flag > 0 ? (
+                          <span className="font-bold text-xs text-red-700">{flag}</span>
+                        ) : (
+                          <span className="text-emerald-700 text-xs font-bold">0</span>
+                        )}
+                      </td>
+                      <td className="text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveCourseId(c.course_id)
+                              navigate('/attendance')
+                            }}
+                            className="btn-ghost btn-sm text-[0.7rem] py-1 px-2"
+                          >
+                            Attendance
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveCourseId(c.course_id)
+                              navigate('/marks')
+                            }}
+                            className="btn-ghost btn-sm text-[0.7rem] py-1 px-2"
+                          >
+                            Marks
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveCourseId(c.course_id)
+                              navigate('/deficits')
+                            }}
+                            className="btn btn-sm text-[0.7rem] py-1 px-2 font-semibold"
+                          >
+                            Deficits
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )
