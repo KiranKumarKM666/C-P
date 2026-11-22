@@ -98,64 +98,83 @@ def build_prompt(name, course, attendance, cie, issue_type):
 def template_draft(name, course, attendance, cie, issue_type):
     n = first_name(name)
     tier = attendance_tier(attendance)
+    # Deterministic variation based on student name and course for distinct, unique drafts
+    seed = (sum(ord(c) for c in (name + course)) % 3)
 
     if issue_type == "attendance":
         if tier == "urgent":
-            return (
-                f"Dear {n},\n\n"
-                f"This is an urgent notice regarding your attendance in {course}. "
-                f"Your current attendance stands at {fmt(attendance)}%, which is below 50%. "
-                f"You are now at risk of being declared ineligible to appear in the semester examinations. "
-                f"I strongly urge you to meet me immediately to discuss a recovery plan. "
-                f"Please do not miss any further classes.\n\n"
-                f"This requires your immediate attention.\n\nRegards"
-            )
+            openings = [
+                f"Dear {n},\n\nI am reaching out with an urgent note regarding your attendance in {course}. Your recorded attendance is currently {fmt(attendance)}%, which places your semester examination eligibility at critical risk.",
+                f"Dear {n},\n\nThis is an urgent academic notification concerning your presence in {course}. Standing at {fmt(attendance)}%, your attendance is well below the minimum threshold required to sit for final exams.",
+                f"Dear {n},\n\nI want to urgently draw your attention to your attendance standing in {course}. At {fmt(attendance)}%, you are in immediate danger of falling short of university exam eligibility criteria.",
+            ]
+            actions = [
+                "Please connect with me during office hours this week so we can review your situation and map out an emergency recovery schedule. Every upcoming lecture counts.",
+                "I strongly encourage you to meet me right away so we can coordinate on missed material and keep you enrolled in good standing. Prioritize attending all remaining sessions.",
+                "Let us schedule an immediate conversation to discuss your circumstances and set up a plan to attend all remaining classes without further absence.",
+            ]
+            return f"{openings[seed]}\n\n{actions[seed]}\n\nBest regards,\nYour Faculty Advisor"
+
         if tier == "critical":
-            return (
-                f"Dear {n},\n\n"
-                f"I want to bring to your attention that your attendance in {course} is {fmt(attendance)}%, "
-                f"which is below the institute's minimum requirement of 75%. "
-                f"If this continues, you may face serious academic consequences. "
-                f"I encourage you to attend every remaining class and meet me to discuss how I can support you.\n\n"
-                f"Let's work together to get you back on track.\n\nRegards"
-            )
+            openings = [
+                f"Dear {n},\n\nI am writing to share an important concern regarding your attendance in {course}. You are currently at {fmt(attendance)}%, which is below the mandatory 75% institute threshold.",
+                f"Dear {n},\n\nYour attendance in {course} has reached {fmt(attendance)}%, placing you below the 75% course requirement. Consistent presence is essential for your academic progress.",
+                f"Dear {n},\n\nI noticed that your attendance in {course} is currently at {fmt(attendance)}%. Falling beneath the 75% mark puts your academic semester standing at risk.",
+            ]
+            actions = [
+                "With disciplined attendance across our remaining classes, you can steadily climb back into the safe zone. Please let me know if you need any support.",
+                "I encourage you to attend every upcoming class without exception. Feel free to stop by if there are personal or academic hurdles you would like to discuss.",
+                "Focus on attending all upcoming lectures consecutively to recover your eligibility. I am here to help you stay on track.",
+            ]
+            return f"{openings[seed]}\n\n{actions[seed]}\n\nWarm regards,\nCourse Instructor"
+
         if tier == "advisory":
-            return (
-                f"Dear {n},\n\n"
-                f"Your attendance in {course} is currently {fmt(attendance)}%, which is in the advisory range. "
-                f"You are not far from the required 75%, but please be careful not to miss any more classes. "
-                f"Consistency now will help you avoid any issues later in the semester. "
-                f"Feel free to reach out if you need any support.\n\n"
-                f"Keep it up!\n\nRegards"
-            )
-        # positive tier — attendance is fine, so this is a general nudge
+            openings = [
+                f"Dear {n},\n\nYour attendance in {course} currently stands at {fmt(attendance)}%. While you are within the advisory range, you are close to the 75% boundary.",
+                f"Dear {n},\n\nI wanted to share a friendly advisory that your attendance in {course} is {fmt(attendance)}%. You are near the 75% cutoff, so consistent vigilance will protect your standing.",
+                f"Dear {n},\n\nChecking in on your progress in {course}—your current attendance is {fmt(attendance)}%. Maintaining steady attendance from here will prevent any last-minute shortages.",
+            ]
+            actions = [
+                "Staying regular for the rest of the term will comfortably keep you in the safe zone. Keep up the momentum!",
+                "Try to avoid any unnecessary absences over the coming weeks so you finish the semester stress-free. Reach out if you need anything.",
+                "A little extra consistency now will ensure you remain safely above the threshold. Best of luck with your coursework!",
+            ]
+            return f"{openings[seed]}\n\n{actions[seed]}\n\nBest regards,\nFaculty Mentor"
+
+        # positive tier
         return (
             f"Dear {n},\n\n"
-            f"Great work maintaining your attendance in {course} at {fmt(attendance)}%! "
-            f"I encourage you to keep this up for the rest of the semester. "
-            f"If you have any concerns or need guidance, please do not hesitate to reach out.\n\n"
-            f"Keep up the excellent effort!\n\nRegards"
+            f"Commendable job maintaining strong attendance in {course} at {fmt(attendance)}%! "
+            f"Your regular participation sets a positive foundation for the semester. "
+            f"Continue this dedicated effort and feel free to reach out if you ever need extra academic resources.\n\n"
+            f"Keep up the great work!\n\nBest regards"
         )
 
     # marks issue
     if tier in ("urgent", "critical"):
-        return (
-            f"Dear {n},\n\n"
-            f"I am writing regarding your performance in {course}. "
-            f"Your internal marks (CIE) stand at {fmt(cie)}%, which is a concern. "
-            f"Given that your attendance is also low at {fmt(attendance)}%, "
-            f"it is important to address both urgently. "
-            f"Please meet me to discuss a study plan and additional support.\n\n"
-            f"I am here to help you succeed.\n\nRegards"
-        )
-    return (
-        f"Dear {n},\n\n"
-        f"Thank you for your effort in {course}. Your internal marks are at {fmt(cie)}% so far, "
-        f"and I believe with focused revision you can improve significantly. "
-        f"I suggest revisiting key topics from recent assessments and attending any doubt-clearing sessions. "
-        f"Please reach out if you need guidance.\n\n"
-        f"I am confident you can do better!\n\nRegards"
-    )
+        openings = [
+            f"Dear {n},\n\nI am writing to discuss your continuous internal evaluation (CIE) standing in {course}. Your score is currently at {fmt(cie)}%, while your attendance is at {fmt(attendance)}%.",
+            f"Dear {n},\n\nI wanted to check in regarding your recent assessments in {course}. Your CIE standing is {fmt(cie)}%, and your attendance is at {fmt(attendance)}%.",
+            f"Dear {n},\n\nLooking over our recent assessment results in {course}, your internal score is at {fmt(cie)}% with attendance at {fmt(attendance)}%.",
+        ]
+        actions = [
+            "Addressing both attendance and core concepts promptly will help you recover ground before finals. Let us meet to review problem areas and build a focused study plan.",
+            "I am confident that structured revision and attending all upcoming lectures will turn things around. Please drop by during consultation hours for guided help.",
+            "Let us work together to strengthen foundational topics. Consistent class participation and review will make a major difference in your next test.",
+        ]
+        return f"{openings[seed]}\n\n{actions[seed]}\n\nWarm regards,\nCourse Instructor"
+
+    openings = [
+        f"Dear {n},\n\nThank you for your active participation in {course}. Your CIE standing is currently {fmt(cie)}%, and with targeted preparation, you can achieve a much higher score.",
+        f"Dear {n},\n\nReflecting on your assessments in {course}, your internal score is {fmt(cie)}%. You have solid potential, and targeted practice on key topics will yield great improvements.",
+        f"Dear {n},\n\nChecking in on your performance in {course}: your CIE score stands at {fmt(cie)}%. A structured revision routine for upcoming tests will help boost your grade.",
+    ]
+    actions = [
+        "I suggest revisiting the latest assignment solutions and joining our peer review sessions. Please reach out if you would like clarifying notes.",
+        "Focus on recurring question types and feel free to ask questions after class. I am confident in your ability to improve.",
+        "Reviewing missed questions from earlier tests is the quickest path to higher marks. Let me know if you need additional study materials.",
+    ]
+    return f"{openings[seed]}\n\n{actions[seed]}\n\nBest regards,\nFaculty Instructor"
 
 
 # ── Provider call ────────────────────────────────────────────────────────────

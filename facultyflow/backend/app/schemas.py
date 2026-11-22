@@ -1,7 +1,7 @@
 import datetime as dt
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator, model_validator
 
 
 class LoginIn(BaseModel):
@@ -116,10 +116,22 @@ class ApproveIn(BaseModel):
 
 
 class SettingsIn(BaseModel):
-    critical_below: float = Field(ge=0, le=100)
-    advisory_upto: float = Field(ge=0, le=100)
-    cie_cutoff: float = Field(ge=0, le=100)
-    drop_points: float = Field(ge=0, le=100)
+    critical_below: float = Field(
+        ge=0, le=100,
+        validation_alias=AliasChoices("attendance_critical", "critical_below"),
+    )
+    advisory_upto: float = Field(
+        ge=0, le=100,
+        validation_alias=AliasChoices("attendance_advisory", "advisory_upto"),
+    )
+    cie_cutoff: float = Field(
+        ge=0, le=100,
+        validation_alias=AliasChoices("cie_low", "cie_cutoff"),
+    )
+    drop_points: float = Field(
+        ge=0, le=100,
+        validation_alias=AliasChoices("cie_drop", "drop_points"),
+    )
 
     @model_validator(mode="after")
     def order(self):

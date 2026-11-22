@@ -2,10 +2,12 @@ import os
 import tempfile
 
 os.environ["DATABASE_URL"] = f"sqlite:///{tempfile.mkdtemp()}/test.db"
+os.environ["SEED_DEMO_DATA"] = "true"
 
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app import seed  # noqa: E402
+from app.config import SETTINGS  # noqa: E402
 from app.main import app  # noqa: E402
 from app.services.analytics import attendance_pct, classify  # noqa: E402
 
@@ -30,6 +32,39 @@ def test_classify_edges():
 
 def test_bad_login():
     assert client.post("/api/auth/login", json={"email": "x@y.z", "password": "no"}).status_code == 401
+
+
+def test_settings_match_admin_frontend_contract():
+    admin = login("hod@college.edu", "admin123")
+    original = SETTINGS.copy()
+    frontend_settings = {
+        "attendance_critical": 72,
+        "attendance_advisory": 84,
+        "cie_low": 38,
+        "cie_drop": 18,
+    }
+    try:
+        response = client.put("/api/settings", headers=admin, json=frontend_settings)
+        assert response.status_code == 200
+        assert response.json() == frontend_settings
+        assert client.get("/api/settings", headers=admin).json() == frontend_settings
+        assert SETTINGS == {
+            "critical_below": 72,
+            "advisory_upto": 84,
+            "cie_cutoff": 38,
+            "drop_points": 18,
+        }
+
+        legacy = {
+            "critical_below": 75,
+            "advisory_upto": 85,
+            "cie_cutoff": 40,
+            "drop_points": 20,
+        }
+        assert client.put("/api/settings", headers=admin, json=legacy).status_code == 200
+        assert SETTINGS == legacy
+    finally:
+        SETTINGS.update(original)
 
 
 def test_spa_dashboard_refresh_and_api_separation():

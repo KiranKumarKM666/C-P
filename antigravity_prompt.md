@@ -1,242 +1,147 @@
-# FacultyFlow: Build and Integration Prompt for Antigravity
+# Antigravity Prompt: Integrate FacultyFlow Frontend with Its FastAPI Backend
 
-## 1. Role and goal
+## Mission
 
-You are a senior full-stack engineer. Build and wire together **FacultyFlow**, a role-based web platform that helps college teachers manage attendance and internal marks (CIE), find at-risk students early, draft AI-assisted advisory messages, and generate PDF/Excel reports.
+Work in the existing FacultyFlow repository. The React frontend already exists and is the source of truth for UI behavior and API requests. Inspect it first, then implement or adjust the FastAPI backend so the frontend works end to end.
 
-**Guiding principle: AI only drafts; the teacher always decides.** No advisory message is saved as final or sent until a faculty member has read, edited and clicked **Approve**.
+Do not redesign or replace the frontend. Do not invent a second API contract, seed production with demo data, expose secrets, or deploy/push changes unless the repository owner separately asks. Keep changes small, testable, and local.
 
-Work in small, verifiable steps. After each phase, run the app or the tests and confirm it works before moving on. Use only dummy student data.
-
-## 2. Starting point
-
-A working starter project exists in `facultyflow/` (unzip `facultyflow.zip` into the workspace). **Extend it. Do not rewrite it from scratch.**
-
-```
-facultyflow/
-├── backend/
-│   ├── app/
-│   │   ├── main.py            # FastAPI app, CORS, serves ../frontend
-│   │   ├── config.py          # env vars, thresholds (SETTINGS dict)
-│   │   ├── database.py        # SQLAlchemy engine/session
-│   │   ├── models.py          # users, courses, students, attendance, marks, advisories
-│   │   ├── schemas.py         # Pydantic validation
-│   │   ├── auth.py            # bcrypt, JWT, require_role, ownership check
-│   │   ├── seed.py            # dummy data + demo logins
-│   │   ├── services/          # analytics, uploads, ai, reports
-│   │   └── routers/           # auth_routes, courses, attendance, marks, advisories, reports
-│   ├── tests/test_app.py
-│   ├── requirements.txt
-│   └── .env.example
-└── frontend/index.html        # React SPA build output (source in frontend-react/)
-```
-
-> **Frontend source:** `facultyflow/frontend-react/` — Vite + React 18 + Tailwind 3 + Three.js r161 + Chart.js 4.  
-> Build: `cd facultyflow/frontend-react && npm run build` → output goes to `facultyflow/frontend/`
-
-First task: install dependencies, run `python -m app.seed`, run `pytest`, start `uvicorn app.main:app --reload`, and confirm http://localhost:8000 loads and the demo logins work.
-
-## 3. Tech stack
-
-| Layer | Tools |
-|---|---|
-| Front end | **React 18, Vite 5, Tailwind CSS 3, Chart.js 4 + react-chartjs-2, Three.js r161** |
-| Back end | Python, FastAPI, Uvicorn, SQLAlchemy |
-| Auth | JWT (PyJWT), bcrypt password hashes |
-| Files | Pandas, openpyxl |
-| Database | SQLite for development, PostgreSQL for deployment |
-| AI | Gemini, OpenAI or Ollama (local), behind one `generate_draft()` function |
-| Reports | ReportLab (PDF), openpyxl (Excel) |
-| Tests | pytest, FastAPI TestClient |
-
-### Frontend structure (React SPA)
-```
-facultyflow/frontend-react/   ← Vite source (npm run build → ../frontend/)
-  src/
-    api.js                    ← single fetch wrapper; all endpoints here
-    main.jsx                  ← ReactDOM.createRoot + BrowserRouter
-    App.jsx                   ← Routes + PrivateRoute + AppShell
-    pages/
-      Login.jsx               ← Three.js glass card landing page
-      Dashboard.jsx           ← Stat cards + course table + Doughnut chart
-      Students.jsx            ← Roster CRUD + CSV upload
-      Attendance.jsx          ← Date picker + radio grid + bulk upload
-      Marks.jsx               ← Assessment selector + marks grid + bulk upload
-      Deficits.jsx            ← Risk table + progress bars + TrendChart + AdvisoryModal
-      Reports.jsx             ← PDF/Excel downloads per report type
-      Admin.jsx               ← Thresholds + user/course creation
-      StudentPortal.jsx       ← Three.js background + glass cards + CIE bar chart
-    components/
-      Navbar.jsx              ← Top nav + role pill + sign-out
-      Chatbot.jsx             ← Floating keyword-based assistant
-```
-
-**Build**: `cd facultyflow/frontend-react && npm run build` → outputs to `facultyflow/frontend/`  
-FastAPI mounts `facultyflow/frontend/` at `/` (static), so API and UI share one origin.
-
-**Dev proxy** (`vite.config.js`): all API paths proxied to `http://localhost:8000`.
-
-## 4. Users and roles
-
-| Role | Can do |
-|---|---|
-| `faculty` | Manage only their own courses: attendance, marks, deficit list, draft and approve advisories, download reports |
-| `admin` (HOD) | Everything faculty can do for all courses, plus create users and courses, change thresholds, department dashboard |
-| `student` | View only their own attendance, CIE and **approved** advisories |
-
-Roles and course ownership are checked **on the server for every request**, not just by hiding buttons.
-
-## 5. Business rules (do not change without asking)
-
-- Attendance % = attended ÷ classes held × 100. Zero classes means "No Data".
-- **Below 75%** is Critical. **75% to 85% inclusive** is Advisory. **Above 85%** is Safe.
-- Low CIE: CIE % below **40%**. Sudden drop: a fall of more than **20 points** between consecutive assessments.
-- All four thresholds live in `config.SETTINGS` and are editable by the admin through `PUT /settings`.
-- Students flagged on both attendance and marks are ranked highest priority. Every flag shows its reason.
-- Marks must be between 0 and the maximum. Maximum must be greater than 0. One entry per student per assessment. Absent is stored as AB, never as zero.
-- Attendance status must be Present or Absent. Dates cannot be in the future. One row per student, course and date.
-
-## 6. Database schema
-
-`users(user_id, name, email unique, password_hash, role)`
-`courses(course_id, course_name, course_code unique, semester, faculty_id → users)`
-`students(student_id, usn unique, name, email, course_id → courses)`
-`attendance(attendance_id, student_id, course_id, date, status)` with a unique constraint on `(student_id, course_id, date)`
-`marks(mark_id, student_id, course_id, assessment_name, max_marks, marks_obtained, is_absent)` with a unique constraint on `(student_id, course_id, assessment_name)`
-`advisories(advisory_id, student_id, course_id, issue_type, ai_draft, final_message, faculty_approved, created_at, approved_at)`
-
-Keep `ai_draft` and `final_message` as separate columns. This is the audit trail. Add indexes on `student_id` and `course_id`.
-
-## 7. API contract (front end and back end must agree on this)
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/auth/login` | Returns `{token, user}` |
-| GET | `/auth/me` | Current user |
-| GET / POST | `/users` | Admin: list and create users |
-| GET / POST | `/courses` | List own courses (admin: all); admin creates |
-| GET / POST | `/courses/{id}/students` | List and add students |
-| DELETE | `/courses/{id}/students/{sid}` | Remove student and their records |
-| POST | `/courses/{id}/students/upload` | CSV/XLSX class list |
-| POST | `/attendance` | Save attendance for a date |
-| GET | `/courses/{id}/attendance?date=` | Prefill the attendance screen |
-| POST | `/attendance/upload?course_id=` | CSV/XLSX bulk attendance |
-| POST | `/marks` | Save marks for one assessment |
-| GET | `/courses/{id}/marks` | Marks table across assessments |
-| GET | `/courses/{id}/summary` | Per-student attendance %, CIE %, status |
-| GET | `/courses/{id}/deficits` | Students needing attention, ranked |
-| POST | `/advisories/draft` | Create an AI draft (not final) |
-| POST | `/advisories/{id}/approve` | Save the approved final message |
-| GET | `/courses/{id}/advisories` | Approved messages only |
-| GET | `/reports/{attendance\|cie\|deficit}?course_id=&format=pdf\|xlsx&date_from=&date_to=&status=` | File download |
-| GET | `/student/me` | Student's own records and approved advisories |
-| GET / PUT | `/settings` | Read thresholds; admin updates |
-| GET | `/dashboard` | Per-course counts of Critical, Advisory, low CIE |
-| GET | `/templates/{students\|attendance}` | CSV templates |
-
-Errors use `{"detail": "..."}`. Validation errors from Pydantic return 422 with a list in `detail`. The front end must turn both into readable messages such as "Marks cannot exceed 25".
-
-## 8. How the pieces integrate
-
-### 8.1 Front end to back end
-- The back end serves `frontend/` as static files at `/`, so the UI and API share one origin (no CORS problems in development). CORS is still enabled for a separately hosted front end.
-- After login, store the JWT in `sessionStorage` and send `Authorization: Bearer <token>` on every request. On a 401, clear the session and return to the login screen.
-- One shared `api()` helper handles headers, JSON, error formatting and file downloads. Do not scatter `fetch` calls with their own error handling.
-- File uploads use `FormData` (do not set `Content-Type` manually). Show the returned `{imported, updated, errors[]}` with the row number and reason for each rejected row.
-- Report downloads: `fetch` with the token, read the response as a `Blob`, then trigger a download through a temporary `<a>` element. A plain link will not send the token.
-
-### 8.2 Authentication and authorization
-- `POST /auth/login` verifies the bcrypt hash and returns a signed JWT (`sub` = user id, `role`, `exp`).
-- `require_role(...)` is a FastAPI dependency on every protected route.
-- `get_course_for_user()` enforces ownership: faculty requesting another faculty's course get **403 "Access denied"**.
-- Students are linked to their records by matching `users.email` to `students.email`.
-
-### 8.3 Data ingestion (Pandas)
-- Accept `.csv` and `.xlsx` only. Normalize column names to lowercase.
-- Validate **each row** and collect `{row, error}` entries. Import the valid rows and report the rest. Never fail silently.
-- Detect duplicates inside the file with a set, and against the database with a dict lookup.
-- Provide downloadable templates for the students and attendance files.
-
-### 8.4 AI drafting
-- `services/ai.py` exposes `generate_draft(name, course, attendance, cie, issue_type)`. The provider is chosen by `AI_PROVIDER` in `.env`: `mock` (default, no key), `gemini`, `openai` or `ollama`.
-- **Data minimization.** Send only: first name, course name, attendance %, CIE %, and issue. Never send email, USN or unrelated records.
-- Use this prompt template:
+## Repository map
 
 ```text
-You are an academic support assistant for a college.
-Write a polite, confidential, motivating message to a student.
-Student name: {name}
-Course: {course}
-Attendance percentage: {attendance}
-CIE percentage: {cie}
-Issue: {attendance shortage / low internal marks}
-Rules:
-- Do not blame the student.
-- Be respectful and specific.
-- Suggest practical next steps.
-- Keep it under 120 words.
-- Do not invent marks or attendance data.
+facultyflow/
+  backend/
+    app/
+      main.py                   # FastAPI app, /api router prefix, SPA fallback, health
+      config.py                 # environment-backed configuration and thresholds
+      database.py               # SQLAlchemy engine and request-scoped sessions
+      models.py                 # users, courses, students, attendance, marks, advisories
+      schemas.py                # Pydantic request validation
+      auth.py                   # JWT auth, roles, course ownership checks
+      routers/                  # auth_routes, courses, attendance, marks, advisories, reports
+      services/                 # analytics, uploads, AI drafts, reports
+    tests/test_app.py
+    requirements.txt
+  frontend-react/
+    src/api.js                  # authoritative frontend API paths and request wrapper
+    src/App.jsx                 # routes and protected views
+    src/context/CourseContext.jsx
+    src/pages/                  # Login, Dashboard, Students, Attendance, Marks,
+                                # Deficits, Reports, Admin, StudentPortal
+  frontend/                     # Vite build output served by FastAPI
+antigravity_prompt.md           # this integration prompt
 ```
 
-- Use timeouts. If the provider fails, fall back to the built-in template draft and say so in the response (`provider` field).
-- After generating, run `check_draft()`: warn if the draft is over 120 words or quotes a percentage that does not match the dashboard.
-- Flow: faculty click **Draft message** → `POST /advisories/draft` (stores `ai_draft`, `faculty_approved = false`) → UI shows an **editable** text box next to the dashboard numbers → faculty click **Approve** → `POST /advisories/{id}/approve` stores `final_message`. Students never see unapproved drafts.
-- API keys live only in environment variables. The browser never calls an AI service directly.
+## Start by verifying the existing contract
 
-### 8.5 Reports
-- Three reports: class-wise attendance, CIE performance, deficit/follow-up. Each is available as PDF and Excel.
-- Filters: course, date range, attendance status. Each report includes course, faculty, generation date, a summary and the table.
-- PDF totals must match the dashboard exactly.
+1. Read `frontend-react/src/api.js` and each page that calls an API before changing backend code.
+2. The frontend defaults to `VITE_API_BASE=/api`. Every application endpoint listed below is therefore mounted under `/api`; for example, the browser calls `/api/auth/login` and `/api/dashboard`.
+3. Keep `/dashboard`, `/attendance`, `/marks`, `/students`, `/reports`, `/admin`, and `/student` available as frontend SPA routes. They are not API endpoints. FastAPI serves the built frontend for browser navigation and refreshes.
+4. Preserve current response fields used by components. If a necessary response change is unavoidable, update the frontend and backend together and add a focused test.
+5. Inspect current migrations/models and existing tests before modifying tables. Do not assume student USNs are globally unique: the same USN may be enrolled in different courses; uniqueness is `(usn, course_id)`.
 
-## 9. Build phases
+## Current frontend API contract
 
-Complete and verify one phase before starting the next.
+The shared fetch wrapper in `frontend-react/src/api.js` sends JSON with `Content-Type: application/json`, sends uploaded files as `FormData` without manually setting the content type, attaches `Authorization: Bearer <token>`, and redirects to `/login` on `401`. Error responses should use FastAPI's readable `{"detail": "..."}` shape. Keep file responses as downloads with a `Content-Disposition` filename.
 
-1. **Run and verify the starter.** Install, seed, test, start. Fix anything broken. Confirm all three demo logins work.
-2. **Harden the back end.** Add Alembic migrations, structured error handling, request logging that never logs passwords, a rate limit on `/auth/login`, and a `/health` endpoint. Keep SQLite in development.
-3. **Polish the front end.** Add loading states, empty states, inline validation messages, a confirm dialog on destructive actions, keyboard-accessible controls, and a layout that works on a phone. Add a trend chart (attendance over time) on the deficits screen.
-4. **Marks upload.** Add `POST /marks/upload` (columns: usn, assessment, max_marks, marks, with AB for absent), using the same row-by-row validation pattern as attendance.
-5. **AI providers.** Test each of `gemini`, `openai` and `ollama` against the same interface. Add a test that mocks the HTTP call and checks the fallback path.
-6. **React front end (DONE).** Rebuilt `frontend/` as a Vite + React + Tailwind app. Source in `facultyflow/frontend-react/`. Built output in `facultyflow/frontend/`. Same API contracts, no endpoints changed. Three.js 3D backgrounds on Login and StudentPortal.
-7. **Deploy.** Switch `DATABASE_URL` to PostgreSQL, add a `Dockerfile`, serve over HTTPS, set a long random `SECRET_KEY`, restrict CORS to the real front-end origin, and deploy to Render or Railway.
+| Method | API path (prefix `/api`) | Frontend use |
+|---|---|---|
+| POST | `/auth/login` | Body `{email, password}`; returns `{token, user:{user_id,name,email,role}}` |
+| GET | `/auth/me` | Returns the current user object |
+| PUT | `/auth/me` | Updates the current user's name/email and optionally password |
+| POST | `/auth/forgot-password` | Body `{email, reason?}`; creates a password-help request for HOD/Admin |
+| GET | `/auth/password-requests` | Admin list; each row includes `request_id,email,reason,status,created_at` |
+| POST | `/auth/password-requests/{request_id}/resolve` | Admin body `{new_password}` |
+| GET / POST | `/users` | Admin list/create; create body `{name,email,password,role}` |
+| PUT / DELETE | `/users/{user_id}` | Admin edit/delete user |
+| GET / POST | `/courses` | List permitted courses / admin creates `{course_name,course_code,semester,faculty_id}` |
+| GET / POST | `/courses/{course_id}/students` | List/add `{usn,name,email?}` within the course |
+| PUT / DELETE | `/courses/{course_id}/students/{student_id}` | Edit/remove a student and course-scoped records |
+| POST | `/courses/{course_id}/students/upload` | Multipart field `file`; CSV/XLSX student roster |
+| GET | `/dashboard` | Returns course rows with course metadata, `student_count`, `critical`, `advisory`, `safe`, `low_cie`, and `flagged` |
+| GET | `/courses/{course_id}/attendance?date=YYYY-MM-DD` | Attendance entries for the selected date |
+| POST | `/attendance` | `{course_id,date,records:[{student_id,status,reason?}]}` |
+| POST | `/attendance/upload?course_id={id}` | Multipart field `file`; CSV/XLSX attendance |
+| GET | `/courses/{course_id}/attendance-trend` | `{rows,labels,values}` for the attendance trend chart |
+| GET | `/courses/{course_id}/marks` | `{assessments,rows}`; each row has student fields, `cells`, and `cie_pct` |
+| POST | `/marks` | `{course_id,assessment_name,max_marks,records:[{student_id,marks_obtained,is_absent}]}` |
+| POST | `/marks/upload?course_id={id}` | Multipart field `file`; CSV/XLSX marks |
+| GET | `/courses/{course_id}/summary` | Per-student attendance/CIE metrics, status, reasons, priority |
+| GET | `/courses/{course_id}/deficits` | Flagged students, ranked by priority |
+| POST | `/advisories/draft` | `{student_id,course_id,issue_type}`; creates an unapproved draft |
+| POST | `/advisories/{advisory_id}/approve` | `{final_message}`; persists teacher-approved message |
+| GET | `/courses/{course_id}/advisories` | Approved advisories for faculty |
+| GET | `/student/me` | `{courses:[...]}` for the signed-in student, including approved messages only |
+| GET / PUT | `/settings` | Read/update thresholds; see exact frontend field names below |
+| GET | `/templates/{students\|attendance\|marks}` | Downloads a CSV template |
+| GET | `/reports/{attendance\|cie\|deficit}?course_id={id}&format=pdf\|xlsx&date_from=&date_to=&status=` | Authenticated PDF/XLSX file download |
 
-## 10. Security and privacy checklist
+### Settings field names
 
-- Passwords are hashed with bcrypt, never stored or logged in plain text.
-- HTTPS in deployment. Secrets in environment variables, never committed. `.env` is in `.gitignore`.
-- Every request is role-checked on the server.
-- The AI sees only the minimum data. Offer Ollama for colleges that do not want student data to leave their network.
-- Real student data is never used in development or tests.
+The Admin page reads and submits exactly these JSON properties:
 
-## 11. Tests that must pass
+```json
+{
+  "attendance_critical": 75,
+  "attendance_advisory": 85,
+  "cie_low": 40,
+  "cie_drop": 20
+}
+```
 
-| Area | Cases |
-|---|---|
-| Validation | Marks of -5; 105 out of 100; text instead of a number; empty fields; future attendance date; invalid status |
-| Calculations | Exactly 75% and exactly 85%; a student with zero classes; 42 of 50 equals 84% |
-| Access control | Faculty A opening Faculty B's course returns 403; no token returns 401; a student calling faculty endpoints returns 403 |
-| Upload | Wrong columns; blank rows; duplicate USNs; unknown USN; non-CSV/XLSX file |
-| AI | Draft is under 120 words; numbers match the dashboard; a draft cannot reach a student without approval |
-| Reports | PDF totals equal dashboard totals; Excel opens correctly |
+The analytics service may retain its internal names (`critical_below`, `advisory_upto`, `cie_cutoff`, `drop_points`), but the API must translate at the boundary. Preserve compatibility with those internal/legacy names if they are already accepted.
 
-Run `pytest` after every phase. Add tests for new features in `backend/tests/`.
+### Upload formats
 
-## 12. Definition of done
+- Students: `usn,name,email`
+- Attendance: `usn,date,status,reason`
+- Marks: `usn,assessment,max_marks,marks`; use `AB` for absent.
+- Accept `.csv` and `.xlsx`, validate each row, and return `{imported,updated,errors:[{row,error}]}`. Reject unsupported formats and oversized inputs explicitly.
+- Attendance accepts Present/Absent (and documented short aliases in upload parsing), disallows future dates, and retains absence reasons.
+- Marks must be between zero and the row's maximum. An absent score is stored as absent, not as zero.
 
-The following demo runs end to end without errors:
+## Authorization and data rules
 
-1. Log in as faculty and open a course.
-2. Upload an attendance sheet (or mark attendance) and see the percentages update.
-3. Open the deficit list and see Critical and Advisory flags with reasons.
-4. Select a student, generate an AI draft, edit it, and click **Approve**.
-5. Log in as that student and see only the approved message.
-6. Download the PDF and Excel reports and check the totals against the dashboard.
-7. Log in as admin, change a threshold, and see the flags change.
+- The API uses a JWT in the `Authorization` header. Login returns a token and a safe user object; never return a password hash.
+- Enforce roles and course ownership on every protected API request. `faculty` can access only their own courses; `admin` can access department courses and admin functions; `student` can access only `/student/me`.
+- Link student accounts to course roster entries by email. A student response must never include another student's records or an unapproved advisory.
+- Admin functions include user/course management, settings, and password-help resolution. Faculty can manage their permitted course rosters, attendance, marks, advisories and reports.
+- Keep each data operation scoped to `course_id`; never use a global-USN lookup when course context is available.
+- Do not enable destructive demo seeding in production. Keep secrets in environment variables; never write credentials into code, docs, logs, or test output.
 
-## 13. Working rules for the agent
+## Academic rules already represented by the app
 
-- Extend the existing code. Do not rename endpoints or tables without asking.
-- Keep functions small. Put business rules in `services/`, not in routers.
-- Explain each change in a short summary and list the files touched.
-- If a requirement is unclear, ask one focused question instead of guessing.
-- Finish by updating `README.md` with setup, `.env` variables, demo logins and how to run the tests.
+- Attendance percent is attended classes divided by recorded classes. No records means `null`/No Data, not 0%.
+- Default attendance categories: below 75% Critical, 75–85% inclusive Advisory, above 85% Safe.
+- Low CIE is below 40%; a consecutive assessment drop greater than 20 points is a warning.
+- Thresholds are adjustable by an admin and must immediately affect analytics.
+- Attendance is unique per student, course and date. Marks are unique per student, course and assessment.
+- AI output is a draft only. A faculty member must review and approve the final message before it appears in the student portal.
+- Minimize data sent to AI providers; never send student email or USN. Set strict HTTP timeouts and use a safe template fallback.
+
+## Implementation and verification workflow
+
+1. Inspect the current backend routes, models, schemas, services, config and tests. Identify real mismatches against the API calls in `frontend-react/src/api.js`; do not recreate working routes.
+2. Implement the smallest backend changes that make the real UI work. Add/adjust frontend code only when the request/response contract itself must change.
+3. Add focused API tests for each changed behavior, especially request/response shapes, authorization, validation and the settings/UI contract.
+4. From `facultyflow/backend`, run:
+
+   ```powershell
+   python -m pytest -q
+   ```
+
+5. From `facultyflow/frontend-react`, run:
+
+   ```powershell
+   npm run build
+   ```
+
+6. If routes or bundled UI were changed, verify that `/dashboard` returns the frontend HTML on browser navigation and `/api/dashboard` remains an authenticated JSON API.
+7. Summarize changed files, behavior, and test/build results. Do not push commits, modify hosted production data, or deploy unless explicitly authorized.
+
+## Definition of done
+
+- The existing React app can sign in and refresh protected SPA routes without confusing frontend routes with API routes.
+- The dashboard, course selector, course roster CRUD, attendance/reasons, marks, deficits/trend, advisory approval, student portal, reports, templates, Admin user/course controls, password-help queue, and thresholds all exchange the shapes expected by the current UI.
+- Role checks and course ownership are enforced server-side.
+- New or fixed behavior has focused passing tests, and the frontend production build succeeds when relevant.

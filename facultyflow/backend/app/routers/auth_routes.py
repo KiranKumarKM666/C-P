@@ -16,6 +16,15 @@ def user_dict(u: User):
     return {"user_id": u.user_id, "name": u.name, "email": u.email, "role": u.role}
 
 
+def settings_dict():
+    return {
+        "attendance_critical": SETTINGS["critical_below"],
+        "attendance_advisory": SETTINGS["advisory_upto"],
+        "cie_low": SETTINGS["cie_cutoff"],
+        "cie_drop": SETTINGS["drop_points"],
+    }
+
+
 @router.post("/auth/login")
 def login(body: LoginIn, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == body.email.strip().lower()).first()
@@ -146,10 +155,10 @@ def resolve_password_request(request_id: int, body: PasswordResetResolveIn,
 
 @router.get("/settings")
 def get_settings(_: User = Depends(get_current_user)):
-    return SETTINGS
+    return settings_dict()
 
 
 @router.put("/settings")
 def update_settings(body: SettingsIn, _: User = Depends(require_role("admin"))):
     SETTINGS.update(body.model_dump())
-    return SETTINGS
+    return settings_dict()
